@@ -5,13 +5,14 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from .views import health_check
+from .views import health_check, api_root
 
 admin.site.site_header = "KrishiSeva Admin Panel | कृषि सेवा"
 admin.site.site_title = "KrishiSeva Operations Portal"
 admin.site.index_title = "Farm Operations Management"
 
 urlpatterns = [
+    path('', api_root, name='api-root'),
     path('health/', health_check, name='health-check-root'),
     path('api/health/', health_check, name='health-check-api'),
     path('admin/', admin.site.urls),

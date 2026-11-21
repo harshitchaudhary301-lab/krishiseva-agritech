@@ -24,6 +24,12 @@ class Command(BaseCommand):
             action='store_true',
             help='Explicitly allow creating the default admin superuser for local dev testing.'
         )
+        parser.add_argument(
+            '--preserve-existing',
+            action='store_true',
+            default=False,
+            help='Do not clear existing users or data.'
+        )
 
     def handle(self, *args, **options):
         from django.conf import settings
@@ -42,21 +48,25 @@ class Command(BaseCommand):
                 "Security notice: Default admin user creation skipped. Run 'python manage.py createsuperuser' for admin access."
             ))
 
-        self.stdout.write(self.style.NOTICE("Clearing old demo data..."))
-        # Clean existing data for clean re-run
-        BookingEvent.objects.all().delete()
-        Booking.objects.all().delete()
-        Quotation.objects.all().delete()
-        ProjectService.objects.all().delete()
-        ServiceRequest.objects.all().delete()
-        FarmProject.objects.all().delete()
-        Farm.objects.all().delete()
-        ProviderService.objects.all().delete()
-        Review.objects.all().delete()
-        Notification.objects.all().delete()
-        
-        # Keep superuser if exists or recreate
-        User.objects.filter(is_superuser=False).delete()
+        preserve_existing = options.get('preserve_existing', False) or (not settings.DEBUG)
+        if not preserve_existing:
+            self.stdout.write(self.style.NOTICE("Clearing old demo data..."))
+            # Clean existing data for clean re-run
+            BookingEvent.objects.all().delete()
+            Booking.objects.all().delete()
+            Quotation.objects.all().delete()
+            ProjectService.objects.all().delete()
+            ServiceRequest.objects.all().delete()
+            FarmProject.objects.all().delete()
+            Farm.objects.all().delete()
+            ProviderService.objects.all().delete()
+            Review.objects.all().delete()
+            Notification.objects.all().delete()
+            
+            # Keep superuser if exists or recreate
+            User.objects.filter(is_superuser=False).delete()
+        else:
+            self.stdout.write(self.style.NOTICE("Preserving existing users and database records..."))
 
         self.stdout.write(self.style.SUCCESS("Seeding service categories..."))
         categories_data = [
