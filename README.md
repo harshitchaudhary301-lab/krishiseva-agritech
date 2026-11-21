@@ -99,9 +99,8 @@ You can log in manually using the credentials below, or click the **"Quick Demo"
 | **Mechanic** | `vikram_mechanic` | `provider123` | Vikram Singh (Kisan Tractor Workshop, ITI Certified, 4.9★) |
 | **Machinery** | `baldev_machinery`| `provider123` | Baldev Singh (Baldev Agro Fleet, Combine Harvesters) |
 | **Tubewell** | `amit_tubewell` | `provider123` | Amit Verma (Verma Tubewell & Motor Works) |
-| **Admin** | `admin` | `admin123` | Harshit Chaudhary (Development Administrator) |
 
-*(Note: Production deployments automatically skip default admin seeding when `DEBUG=False` for security).*
+*(Note: Default admin account creation with predictable credentials is strictly disabled for security. Production administrators must be created using `python manage.py createsuperuser`).*
 
 ---
 

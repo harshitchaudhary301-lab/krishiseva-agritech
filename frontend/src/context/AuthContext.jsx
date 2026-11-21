@@ -33,12 +33,6 @@ export const DEMO_USERS = {
     password: 'provider123',
     label: 'Amit Verma (Tubewell & Motor Technician, Daurala)',
     role: 'provider'
-  },
-  admin: {
-    username: 'admin',
-    password: 'admin123',
-    label: 'Administrator (Operations & Admin Portal)',
-    role: 'admin'
   }
 };
 

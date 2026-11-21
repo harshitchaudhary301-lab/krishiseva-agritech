@@ -16,24 +16,30 @@ class Command(BaseCommand):
         parser.add_argument(
             '--skip-admin',
             action='store_true',
-            help='Skip creating the default admin superuser (recommended for production).'
+            default=True,
+            help='Skip creating the default admin superuser (default: True for security).'
         )
         parser.add_argument(
             '--include-admin',
             action='store_true',
-            help='Explicitly allow creating the default admin superuser even in production mode.'
+            help='Explicitly allow creating the default admin superuser for local dev testing.'
         )
 
     def handle(self, *args, **options):
         from django.conf import settings
-        skip_admin = options.get('skip_admin', False)
         include_admin = options.get('include_admin', False)
+        # Default to skipping admin unless explicitly requested and in DEBUG mode
+        skip_admin = not include_admin or not settings.DEBUG
 
-        if not settings.DEBUG and not include_admin:
+        if not settings.DEBUG and include_admin:
             skip_admin = True
             self.stdout.write(self.style.WARNING(
-                "Production environment detected: Skipping default admin superuser creation for security.\n"
+                "Production environment detected: Default admin superuser creation is disabled for security.\n"
                 "Please run 'python manage.py createsuperuser' to set a secure administrator password."
+            ))
+        elif skip_admin:
+            self.stdout.write(self.style.NOTICE(
+                "Security notice: Default admin user creation skipped. Run 'python manage.py createsuperuser' for admin access."
             ))
 
         self.stdout.write(self.style.NOTICE("Clearing old demo data..."))
@@ -171,26 +177,9 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Seeding demo users..."))
 
-        # Admin user (skipped if --skip-admin or in production without --include-admin)
-        if not skip_admin:
-            admin_user, created = User.objects.get_or_create(username='admin', defaults={
-                'email': 'admin@krishiseva.in',
-                'first_name': 'Harshit',
-                'last_name': 'Chaudhary',
-                'role': 'admin',
-                'phone': '+91 98000 00001',
-                'state': 'Uttar Pradesh',
-                'district': 'Meerut',
-                'village': 'Daurala',
-                'is_staff': True,
-                'is_superuser': True
-            })
-            admin_user.set_password('admin123')
-            admin_user.is_staff = True
-            admin_user.is_superuser = True
-            admin_user.save()
-        else:
-            self.stdout.write(self.style.NOTICE("Skipped admin user creation as requested."))
+        # Admin superuser creation is intentionally excluded from seed_demo_data to prevent
+        # predictable admin credentials. Administrators must run 'python manage.py createsuperuser'.
+        self.stdout.write(self.style.NOTICE("Admin superuser creation skipped. Use 'python manage.py createsuperuser' for admin access."))
 
         # Farmer 1: Ramesh Patel
         farmer1, _ = User.objects.get_or_create(username='ramesh_farmer', defaults={
@@ -662,11 +651,15 @@ class Command(BaseCommand):
             link_url="/provider/matching"
         )
 
-        self.stdout.write(self.style.SUCCESS("""
+        admin_info = """   6. Admin Superuser:
+      Predictable demo admin credentials are disabled for security.
+      Create your secure administrator with: python manage.py createsuperuser"""
+
+        self.stdout.write(self.style.SUCCESS(f"""
 ======================================================================
   KRISHISEVA DEMO DATA SUCCESSFULLY SEEDED!
 ======================================================================
-  Fictional Demo Logins (Password: <role>123 or admin123):
+  Fictional Demo Logins:
   
   1. Farmer:
      Username: ramesh_farmer
@@ -693,10 +686,7 @@ class Command(BaseCommand):
      Password: provider123
      Role: Provider (Verma Tubewell & Motor Works, 4.8★)
 
-  6. Admin:
-     Username: admin
-     Password: admin123
-     Role: Administrator (Access to Django Admin /admin/)
+{admin_info}
 
 ======================================================================
 """))

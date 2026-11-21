@@ -98,18 +98,6 @@ export default function QuickDemoModal({ isOpen, onClose }) {
       desc: lang === 'hi'
         ? 'सबमर्सिबल मोटर, वाइंडिंग और स्टार्टर मरम्मत विशेषज्ञ (4.8★)।'
         : 'Borewell pump rewinding & electrical starter repair.'
-    },
-    {
-      key: 'admin',
-      name: 'Harshit Chaudhary',
-      roleText: lang === 'hi' ? 'सिस्टम प्रशासक' : 'Platform Administrator',
-      village: 'Meerut Center',
-      badge: lang === 'hi' ? 'एडमिन पोर्टल' : 'Admin Panel',
-      icon: ShieldCheck,
-      color: 'bg-purple-50 text-purple-800 border-purple-200 hover:border-purple-500',
-      desc: lang === 'hi'
-        ? 'सत्यापन, ऑडिट ट्रेल, शिकायत निवारण और संपूर्ण डेटा प्रबंधन।'
-        : 'Full access to Django admin, user verifications and audit logs.'
     }
   ];
 
