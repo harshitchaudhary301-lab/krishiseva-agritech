@@ -1,0 +1,15 @@
+Dataset,Official URL,Access status,Format / parameters,Licence,Limitations
+DES foodgrain table,https://desagri.gov.in/wp-content/uploads/2024/11/Agricultural-Statisitcs-at-a-Glance-2024-25_%E0%A4%95%E0%A5%83%E0%A4%B7%E0%A4%BF-%E0%A4%B8%E0%A4%BE%E0%A4%82%E0%A4%96%E0%A5%8D%E0%A4%AF%E0%A4%BF%E0%A4%95%E0%A5%80-%E0%A4%8F%E0%A4%95-%E0%A4%9D%E0%A4%B2%E0%A4%95-2024%E2%80%9325-1.pdf,Table inspected via web,PDF; area production yield,Not audited,10 major states only
+DES district APY,https://data.desagri.gov.in/website/crops-apy-report-web,Interface inspected,State district crop season year,Not audited,No records extracted
+SoilGrids,https://docs.isric.org/globaldata/soilgrids/,Documentation inspected; raster not acquired,250m raster; soil properties,CC BY 4.0,REST paused; regional use
+SoilGrids WebDAV,https://docs.isric.org/globaldata/soilgrids/WebDav.html,Documentation inspected; DNS failed,VRT,CC BY 4.0,No file retrieved
+Agriculture Census,https://agcensus.gov.in/,Not inspected,Unknown,Not audited,Pending
+LGD,https://lgdirectory.gov.in/,Not inspected,Unknown,Not audited,Pending
+NBSS&LUP,https://nbsslup.icar.gov.in/,Not inspected,Unknown,Not audited,Pending
+Soil Health Card,https://soilhealth.dac.gov.in/,Not inspected,Unknown,Not audited,Pending
+IMD,https://mausam.imd.gov.in/,Not inspected,Unknown,Not audited,Pending
+CGWB,https://cgwb.gov.in/,Not inspected,Unknown,Not audited,Pending
+Sentinel,https://dataspace.copernicus.eu/,Not inspected,Unknown,Not audited,Pending
+Landsat,https://earthexplorer.usgs.gov/,Not inspected,Unknown,Not audited,Pending
+Bhuvan,https://bhuvan.nrsc.gov.in/,Not inspected,Unknown,Not audited,Pending
+ICAR,https://icar.gov.in/,Not inspected,Unknown,Not audited,Pending

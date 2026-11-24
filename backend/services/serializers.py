@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import ServiceCategory, Village, ProviderService, Review
+from .models import (
+    ServiceCategory, Village, ProviderService, Review,
+    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage
+)
 from accounts.serializers import UserSerializer
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
@@ -43,3 +46,21 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = ['id', 'reviewer', 'reviewer_name', 'target_user', 'rating', 'comment', 'created_at']
         read_only_fields = ['reviewer', 'created_at']
+
+
+class AgriculturalReferenceRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgriculturalReferenceRecord
+        fields = '__all__'
+
+
+class HistoricalMachineryRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HistoricalMachineryRate
+        fields = '__all__'
+
+
+class HistoricalAgriculturalWageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HistoricalAgriculturalWage
+        fields = '__all__'

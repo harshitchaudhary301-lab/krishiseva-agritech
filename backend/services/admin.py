@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Village, ServiceCategory, ProviderService, Review
+from .models import (
+    Village, ServiceCategory, ProviderService, Review,
+    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage
+)
 
 @admin.register(Village)
 class VillageAdmin(admin.ModelAdmin):
@@ -25,3 +28,21 @@ class ReviewAdmin(admin.ModelAdmin):
     list_display = ('target_user', 'reviewer', 'rating', 'created_at')
     list_filter = ('rating',)
     search_fields = ('comment', 'target_user__username', 'reviewer__username')
+
+@admin.register(AgriculturalReferenceRecord)
+class AgriculturalReferenceRecordAdmin(admin.ModelAdmin):
+    list_display = ('record_id', 'state', 'indicator', 'original_value', 'unit', 'reference_period', 'evidence_classification')
+    list_filter = ('state', 'evidence_classification', 'indicator')
+    search_fields = ('record_id', 'state', 'indicator', 'source_publisher')
+
+@admin.register(HistoricalMachineryRate)
+class HistoricalMachineryRateAdmin(admin.ModelAdmin):
+    list_display = ('equipment_type', 'operation', 'state', 'historical_rate_min', 'historical_rate_max', 'rate_unit', 'reference_year')
+    list_filter = ('state', 'reference_year', 'operation')
+    search_fields = ('equipment_type', 'operation', 'source_reference')
+
+@admin.register(HistoricalAgriculturalWage)
+class HistoricalAgriculturalWageAdmin(admin.ModelAdmin):
+    list_display = ('state', 'operation', 'reference_year', 'daily_wage_rate', 'gender_category')
+    list_filter = ('state', 'reference_year', 'gender_category')
+    search_fields = ('state', 'operation', 'source_reference')

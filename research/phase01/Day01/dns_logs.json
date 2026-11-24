@@ -1,0 +1,17 @@
+[
+  {
+    "host": "rest.isric.org",
+    "status": "failed",
+    "result": "[Errno -3] Temporary failure in name resolution"
+  },
+  {
+    "host": "files.isric.org",
+    "status": "failed",
+    "result": "[Errno -3] Temporary failure in name resolution"
+  },
+  {
+    "host": "desagri.gov.in",
+    "status": "failed",
+    "result": "[Errno -3] Temporary failure in name resolution"
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "categories": {
+    "accepted": 16,
+    "skipped": 0,
+    "rejected": 0
+  },
+  "machinery_rates": {
+    "accepted": 27,
+    "skipped": 0,
+    "rejected": 0
+  },
+  "wage_observations": {
+    "accepted": 22,
+    "skipped": 0,
+    "rejected": 0
+  },
+  "reference_records": {
+    "accepted": 360,
+    "skipped": 0,
+    "rejected": 0
+  },
+  "input_manifest": {
+    "Parameter_records.csv": {
+      "path": "C:\\Users\\Harshit\\Downloads\\krishi\\research\\phase02\\Parameter_records.csv",
+      "sha256": "8a6cd240cd548ee95f7ac6486b12e146f62be9ac9361692e2e6f391ffc45d6a6",
+      "size_bytes": 30313
+    },
+    "Agricultural_Master_Database_V2.xlsx": {
+      "path": "C:\\Users\\Harshit\\Downloads\\krishi\\research\\phase02\\Agricultural_Master_Database_V2.xlsx",
+      "sha256": "ceb7aba8e36e039506a81a536dfaf1a5ca226ecd9a153b264e57b4ef1c250ee2",
+      "size_bytes": 18058
+    },
+    "District_Research_Workbook.xlsx": {
+      "path": "C:\\Users\\Harshit\\Downloads\\krishi\\research\\phase02\\District_Research_Workbook.xlsx",
+      "sha256": "70ff70215f0fa155feb59f0cd355ddd950f9e6fc04c4497c490aa69090d7ab9e",
+      "size_bytes": 4105
+    },
+    "KrishiSeva_Phase_01_Master_Research_Report.pdf": {
+      "path": "C:\\Users\\Harshit\\Downloads\\krishi\\research\\original_sources\\KrishiSeva_Phase_01_Master_Research_Report.pdf",
+      "sha256": "46440d6587d8c63405f72ff77e4965586bfe1a640b5a772ee9ad90512d16e3fc",
+      "size_bytes": 66393
+    }
+  }
+}

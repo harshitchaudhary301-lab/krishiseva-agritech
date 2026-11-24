@@ -2,8 +2,14 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Q, Avg
-from .models import ServiceCategory, Village, ProviderService, Review
-from .serializers import ServiceCategorySerializer, VillageSerializer, ProviderServiceSerializer, ReviewSerializer
+from .models import (
+    ServiceCategory, Village, ProviderService, Review,
+    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage
+)
+from .serializers import (
+    ServiceCategorySerializer, VillageSerializer, ProviderServiceSerializer, ReviewSerializer,
+    AgriculturalReferenceRecordSerializer, HistoricalMachineryRateSerializer, HistoricalAgriculturalWageSerializer
+)
 from accounts.models import User
 from accounts.serializers import UserSerializer
 
@@ -32,25 +38,57 @@ class VillageListView(generics.ListAPIView):
 
 
 class ProviderDirectoryView(APIView):
+    """
+    Agricultural service provider and worker discovery endpoint.
+    Filters by: category, village, verification status, declared availability.
+    """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        role = request.query_params.get('role', 'provider')
+        role = request.query_params.get('role', 'all')
         category_slug = request.query_params.get('category')
         village = request.query_params.get('village')
+        verification_filter = request.query_params.get('verification')
+        availability_only = request.query_params.get('available')
 
-        qs = User.objects.filter(is_active=True)
-        if role in ['worker', 'provider']:
-            qs = qs.filter(role=role)
+        qs = User.objects.filter(is_active=True).select_related('provider_profile', 'worker_profile')
+
+        if role == 'worker':
+            qs = qs.filter(role='worker')
+        elif role == 'provider':
+            qs = qs.filter(role='provider')
         else:
             qs = qs.filter(role__in=['worker', 'provider'])
 
-        if village:
-            qs = qs.filter(Q(village__iexact=village) | Q(provider_profile__service_villages__icontains=village))
+        # Availability filter
+        if availability_only in ['true', '1', 'yes']:
+            qs = qs.filter(
+                Q(worker_profile__is_available=True) |
+                Q(provider_profile__is_available=True)
+            )
 
+        # Verification status filter
+        if verification_filter:
+            qs = qs.filter(
+                Q(worker_profile__verification_status=verification_filter) |
+                Q(provider_profile__verification_status=verification_filter)
+            )
+
+        # Village filter
+        if village:
+            qs = qs.filter(
+                Q(village__iexact=village) |
+                Q(provider_profile__service_villages__icontains=village)
+            )
+
+        # Category filter
         if category_slug:
-            if role == 'worker':
-                pass # workers can do harvesting/labour
+            if category_slug == 'labour':
+                qs = qs.filter(
+                    Q(role='worker') |
+                    Q(provider_profile__service_categories__icontains='labour') |
+                    Q(services__category__slug='labour')
+                )
             else:
                 qs = qs.filter(
                     Q(provider_profile__service_categories__icontains=category_slug) |
@@ -85,3 +123,70 @@ class ReviewListCreateView(generics.ListCreateAPIView):
             elif hasattr(target, 'provider_profile'):
                 target.provider_profile.rating = round(new_avg, 2)
                 target.provider_profile.save()
+
+
+class HistoricalMachineryRateListView(generics.ListAPIView):
+    """
+    Read-only historical machinery rental comparisons for farmer planning.
+    STRICT RULE: Rates are benchmarks only and not live provider quotes.
+    """
+    permission_classes = [permissions.AllowAny]
+    serializer_class = HistoricalMachineryRateSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = HistoricalMachineryRate.objects.all()
+        operation = self.request.query_params.get('operation')
+        equipment = self.request.query_params.get('equipment')
+        district = self.request.query_params.get('district')
+        if operation:
+            qs = qs.filter(operation__icontains=operation)
+        if equipment:
+            qs = qs.filter(equipment_type__icontains=equipment)
+        if district:
+            qs = qs.filter(district__iexact=district)
+        return qs
+
+
+class HistoricalAgriculturalWageListView(generics.ListAPIView):
+    """
+    Read-only historical agricultural wage observations.
+    STRICT RULE: Wages are benchmarks only and not agreed worker payments.
+    """
+    permission_classes = [permissions.AllowAny]
+    serializer_class = HistoricalAgriculturalWageSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = HistoricalAgriculturalWage.objects.all()
+        year = self.request.query_params.get('year')
+        operation = self.request.query_params.get('operation')
+        state = self.request.query_params.get('state')
+        if year:
+            qs = qs.filter(reference_year=year)
+        if operation:
+            qs = qs.filter(operation__icontains=operation)
+        if state:
+            qs = qs.filter(state__iexact=state)
+        return qs
+
+
+class AgriculturalReferenceRecordListView(generics.ListAPIView):
+    """
+    Canonical agricultural statistical reference records.
+    """
+    permission_classes = [permissions.AllowAny]
+    serializer_class = AgriculturalReferenceRecordSerializer
+
+    def get_queryset(self):
+        qs = AgriculturalReferenceRecord.objects.all()
+        state = self.request.query_params.get('state')
+        indicator = self.request.query_params.get('indicator')
+        crop = self.request.query_params.get('crop')
+        if state:
+            qs = qs.filter(state__iexact=state)
+        if indicator:
+            qs = qs.filter(indicator__icontains=indicator)
+        if crop:
+            qs = qs.filter(crop__icontains=crop)
+        return qs
