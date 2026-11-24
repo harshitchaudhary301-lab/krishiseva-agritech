@@ -1,13 +1,90 @@
 from rest_framework import serializers
-from .models import Farm, FarmProject, ProjectService
+from .models import (
+    Farm, Field, CropTemplate, CropOperationTemplate,
+    FarmProject, ProjectOperation, ProjectService
+)
 from services.serializers import ServiceCategorySerializer
 from bookings.serializers import ServiceRequestSerializer
 
+class FieldSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Field
+        fields = ['id', 'farm', 'name', 'area_acres', 'soil_type', 'irrigation_status', 'created_at']
+        read_only_fields = ['created_at']
+
+
 class FarmSerializer(serializers.ModelSerializer):
+    fields = FieldSerializer(many=True, read_only=True)
+
     class Meta:
         model = Farm
-        fields = ['id', 'farmer', 'name', 'village', 'district', 'state', 'size_acres', 'current_crops', 'soil_type', 'irrigation_source', 'created_at']
+        fields = [
+            'id', 'farmer', 'name', 'village', 'district', 'state',
+            'size_acres', 'current_crops', 'soil_type', 'irrigation_source',
+            'fields', 'created_at'
+        ]
         read_only_fields = ['farmer', 'created_at']
+
+
+class CropOperationTemplateSerializer(serializers.ModelSerializer):
+    default_service_category_details = ServiceCategorySerializer(source='default_service_category', read_only=True)
+
+    class Meta:
+        model = CropOperationTemplate
+        fields = [
+            'id', 'crop_template', 'sequence_order', 'operation_name_en',
+            'operation_name_hi', 'stage', 'default_service_category',
+            'default_service_category_details', 'offset_start_days',
+            'offset_duration_days', 'is_mandatory', 'description'
+        ]
+
+
+class CropTemplateSerializer(serializers.ModelSerializer):
+    operations = CropOperationTemplateSerializer(many=True, read_only=True)
+    operations_count = serializers.IntegerField(source='operations.count', read_only=True)
+
+    class Meta:
+        model = CropTemplate
+        fields = [
+            'id', 'slug', 'crop_name_en', 'crop_name_hi', 'variant_name_en',
+            'variant_name_hi', 'season', 'typical_duration_days', 'version',
+            'description_en', 'description_hi', 'operations_count', 'operations', 'is_active'
+        ]
+
+
+class ProjectOperationSerializer(serializers.ModelSerializer):
+    service_category_details = ServiceCategorySerializer(source='service_category', read_only=True)
+    prerequisite_name = serializers.CharField(source='prerequisite_operation.operation_name_en', read_only=True)
+    booking_reference = serializers.CharField(source='booking.reference_id', read_only=True)
+
+    class Meta:
+        model = ProjectOperation
+        fields = [
+            'id', 'project', 'sequence_order', 'operation_name_en', 'operation_name_hi',
+            'stage', 'service_category', 'service_category_details',
+            'service_request', 'booking', 'booking_reference', 'status',
+            'planned_start_date', 'planned_end_date', 'actual_start_date',
+            'actual_completion_date', 'is_mandatory', 'is_manual',
+            'prerequisite_operation', 'prerequisite_name', 'notes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, attrs):
+        # Validate dependency on update/create
+        prereq = attrs.get('prerequisite_operation')
+        instance_id = self.instance.id if self.instance else None
+        if prereq and instance_id:
+            if prereq.id == instance_id:
+                raise serializers.ValidationError({"prerequisite_operation": "An operation cannot depend on itself."})
+            visited = {instance_id}
+            curr = prereq
+            while curr:
+                if curr.id in visited:
+                    raise serializers.ValidationError({"prerequisite_operation": f"Circular task dependency detected with '{curr.operation_name_en}'."})
+                visited.add(curr.id)
+                curr = curr.prerequisite_operation
+        return attrs
 
 
 class ProjectServiceSerializer(serializers.ModelSerializer):
@@ -43,44 +120,27 @@ class ProjectServiceSerializer(serializers.ModelSerializer):
 class FarmProjectSerializer(serializers.ModelSerializer):
     farmer_name = serializers.CharField(source='farmer.get_full_name', read_only=True)
     farm_name = serializers.CharField(source='farm.name', read_only=True)
+    field_name = serializers.CharField(source='field.name', read_only=True)
+    project_operations = ProjectOperationSerializer(many=True, read_only=True)
     project_services = ProjectServiceSerializer(many=True, read_only=True)
+    progress_info = serializers.SerializerMethodField()
     completion_percentage = serializers.SerializerMethodField()
-    services_count = serializers.IntegerField(source='project_services.count', read_only=True)
-    confirmed_count = serializers.SerializerMethodField()
 
     class Meta:
         model = FarmProject
         fields = [
             'id', 'farmer', 'farmer_name', 'farm', 'farm_name',
-            'name', 'crop', 'target_area_acres', 'start_date',
+            'field', 'field_name', 'crop_template', 'template_version',
+            'name', 'crop', 'variant', 'target_area_acres', 'start_date',
             'expected_completion_date', 'status', 'estimated_budget',
-            'actual_cost', 'notes', 'project_services', 'completion_percentage',
-            'services_count', 'confirmed_count', 'created_at', 'updated_at'
+            'actual_cost', 'notes', 'project_operations', 'project_services',
+            'progress_info', 'completion_percentage', 'created_at', 'updated_at'
         ]
         read_only_fields = ['farmer', 'status', 'estimated_budget', 'actual_cost', 'created_at', 'updated_at']
 
-    def get_completion_percentage(self, obj):
-        services = obj.project_services.all()
-        if not services.exists():
-            return 0
-        total = services.count()
-        completed = 0
-        confirmed = 0
-        for s in services:
-            if s.service_request and hasattr(s.service_request, 'booking') and s.service_request.booking:
-                if s.service_request.booking.status == 'completed':
-                    completed += 1
-                elif s.service_request.booking.status in ['confirmed', 'scheduled', 'in_progress']:
-                    confirmed += 1
-        # Weight: 100% per completed, 50% per confirmed
-        progress = ((completed * 100) + (confirmed * 50)) / total
-        return min(int(progress), 100)
+    def get_progress_info(self, obj):
+        return obj.calculate_actual_progress()
 
-    def get_confirmed_count(self, obj):
-        services = obj.project_services.all()
-        confirmed = 0
-        for s in services:
-            if s.service_request and hasattr(s.service_request, 'booking') and s.service_request.booking:
-                if s.service_request.booking.status in ['confirmed', 'scheduled', 'in_progress', 'completed']:
-                    confirmed += 1
-        return confirmed
+    def get_completion_percentage(self, obj):
+        prog = obj.calculate_actual_progress()
+        return prog.get('percentage')
