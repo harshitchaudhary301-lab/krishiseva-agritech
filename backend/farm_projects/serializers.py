@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     Farm, Field, CropTemplate, CropOperationTemplate,
-    FarmProject, ProjectOperation, ProjectService
+    FarmProject, ProjectOperation, ProjectService,
+    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment
 )
 from services.serializers import ServiceCategorySerializer
 from bookings.serializers import ServiceRequestSerializer
@@ -117,6 +118,56 @@ class ProjectServiceSerializer(serializers.ModelSerializer):
         return 0.0
 
 
+class FinancialAdjustmentSerializer(serializers.ModelSerializer):
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = FinancialAdjustment
+        fields = ['id', 'expense', 'amount', 'reason', 'approved_by', 'approved_by_name', 'created_at']
+        read_only_fields = ['expense', 'approved_by', 'created_at']
+
+
+class ExpenseRecordSerializer(serializers.ModelSerializer):
+    adjustments = FinancialAdjustmentSerializer(many=True, read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    type_display = serializers.CharField(source='get_record_type_display', read_only=True)
+
+    class Meta:
+        model = ExpenseRecord
+        fields = [
+            'id', 'project', 'category', 'category_display', 'record_type',
+            'type_display', 'booking', 'title', 'amount', 'status', 'notes',
+            'adjustments', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['project', 'created_at', 'updated_at']
+
+
+class PaymentRecordSerializer(serializers.ModelSerializer):
+    payer_name = serializers.CharField(source='payer.get_full_name', read_only=True)
+    payee_name = serializers.CharField(source='payee.get_full_name', read_only=True)
+    type_display = serializers.CharField(source='get_payment_type_display', read_only=True)
+
+    class Meta:
+        model = PaymentRecord
+        fields = [
+            'id', 'project', 'expense', 'booking', 'payer', 'payer_name',
+            'payee', 'payee_name', 'payment_type', 'type_display', 'amount',
+            'payment_mode', 'transaction_reference', 'notes', 'payment_date', 'created_at'
+        ]
+        read_only_fields = ['project', 'payer', 'created_at']
+
+
+class RevenueRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RevenueRecord
+        fields = [
+            'id', 'project', 'crop', 'quantity_quintals', 'rate_per_quintal',
+            'total_realized_revenue', 'buyer_name', 'mandi_or_mill',
+            'sale_date', 'created_at'
+        ]
+        read_only_fields = ['project', 'total_realized_revenue', 'created_at']
+
+
 class FarmProjectSerializer(serializers.ModelSerializer):
     farmer_name = serializers.CharField(source='farmer.get_full_name', read_only=True)
     farm_name = serializers.CharField(source='farm.name', read_only=True)
@@ -125,6 +176,7 @@ class FarmProjectSerializer(serializers.ModelSerializer):
     project_services = ProjectServiceSerializer(many=True, read_only=True)
     progress_info = serializers.SerializerMethodField()
     completion_percentage = serializers.SerializerMethodField()
+    financial_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = FarmProject
@@ -134,7 +186,8 @@ class FarmProjectSerializer(serializers.ModelSerializer):
             'name', 'crop', 'variant', 'target_area_acres', 'start_date',
             'expected_completion_date', 'status', 'estimated_budget',
             'actual_cost', 'notes', 'project_operations', 'project_services',
-            'progress_info', 'completion_percentage', 'created_at', 'updated_at'
+            'progress_info', 'completion_percentage', 'financial_summary',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['farmer', 'status', 'estimated_budget', 'actual_cost', 'created_at', 'updated_at']
 
@@ -144,3 +197,6 @@ class FarmProjectSerializer(serializers.ModelSerializer):
     def get_completion_percentage(self, obj):
         prog = obj.calculate_actual_progress()
         return prog.get('percentage')
+
+    def get_financial_summary(self, obj):
+        return obj.get_financial_summary()

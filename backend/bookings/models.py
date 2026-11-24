@@ -296,6 +296,9 @@ class Booking(models.Model):
             )
 
             if locked.request.farm_project:
+                from farm_projects.models import ExpenseRecord
+                # FIN-08: Booking cancellation releases confirmed commitment
+                ExpenseRecord.objects.filter(booking=locked, record_type='commitment').update(status='released')
                 locked.request.farm_project.update_project_status()
 
             self.status = locked.status
@@ -384,6 +387,28 @@ class Booking(models.Model):
             )
 
             if locked.request.farm_project:
+                if is_approved:
+                    from farm_projects.models import ExpenseRecord
+                    # FIN-02 / FIN-08: Fulfill active commitment
+                    ExpenseRecord.objects.filter(booking=locked, record_type='commitment').update(status='fulfilled')
+
+                    # FIN-03 / FIN-10: Incurred expenditure recorded idempotently
+                    cat = 'machinery'
+                    if locked.request.category and locked.request.category.slug in ['labour', 'irrigation']:
+                        cat = locked.request.category.slug
+
+                    ExpenseRecord.objects.update_or_create(
+                        project=locked.request.farm_project,
+                        booking=locked,
+                        record_type='incurred',
+                        defaults={
+                            'category': cat,
+                            'title': f"Completed Service {locked.reference_id}: {locked.request.title}",
+                            'amount': locked.agreed_amount,
+                            'status': 'active',
+                            'notes': f"Farmer approved completion. Incurred liability ₹{locked.agreed_amount}."
+                        }
+                    )
                 locked.request.farm_project.update_project_status()
 
             self.status = locked.status

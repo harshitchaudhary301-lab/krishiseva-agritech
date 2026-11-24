@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Farm, Field, CropTemplate, CropOperationTemplate, FarmProject, ProjectOperation, ProjectService
+from .models import (
+    Farm, Field, CropTemplate, CropOperationTemplate, FarmProject, ProjectOperation, ProjectService,
+    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment
+)
 
 class FieldInline(admin.TabularInline):
     model = Field
@@ -61,3 +64,31 @@ class ProjectServiceAdmin(admin.ModelAdmin):
     list_display = ('project', 'category', 'service_request', 'target_date')
     list_filter = ('category',)
     search_fields = ('project__name', 'scope_description')
+
+class FinancialAdjustmentInline(admin.TabularInline):
+    model = FinancialAdjustment
+    extra = 0
+
+@admin.register(ExpenseRecord)
+class ExpenseRecordAdmin(admin.ModelAdmin):
+    list_display = ('project', 'category', 'record_type', 'title', 'amount', 'status', 'created_at')
+    list_filter = ('record_type', 'category', 'status')
+    search_fields = ('title', 'project__name')
+    inlines = [FinancialAdjustmentInline]
+
+@admin.register(PaymentRecord)
+class PaymentRecordAdmin(admin.ModelAdmin):
+    list_display = ('project', 'payment_type', 'amount', 'payer', 'payee', 'payment_date')
+    list_filter = ('payment_type', 'payment_date')
+    search_fields = ('project__name', 'payer__username', 'transaction_reference')
+
+@admin.register(RevenueRecord)
+class RevenueRecordAdmin(admin.ModelAdmin):
+    list_display = ('project', 'crop', 'quantity_quintals', 'rate_per_quintal', 'total_realized_revenue', 'sale_date')
+    list_filter = ('crop', 'sale_date')
+    search_fields = ('project__name', 'buyer_name', 'mandi_or_mill')
+
+@admin.register(FinancialAdjustment)
+class FinancialAdjustmentAdmin(admin.ModelAdmin):
+    list_display = ('expense', 'amount', 'reason', 'approved_by', 'created_at')
+    search_fields = ('expense__title', 'reason')

@@ -7,11 +7,13 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import (
     Farm, Field, CropTemplate, CropOperationTemplate,
-    FarmProject, ProjectOperation, ProjectService
+    FarmProject, ProjectOperation, ProjectService,
+    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment
 )
 from .serializers import (
     FarmSerializer, FieldSerializer, CropTemplateSerializer,
-    FarmProjectSerializer, ProjectOperationSerializer, ProjectServiceSerializer
+    FarmProjectSerializer, ProjectOperationSerializer, ProjectServiceSerializer,
+    ExpenseRecordSerializer, PaymentRecordSerializer, RevenueRecordSerializer, FinancialAdjustmentSerializer
 )
 from bookings.models import ServiceRequest
 from services.models import ServiceCategory
@@ -255,3 +257,119 @@ class ProjectAddServiceView(APIView):
 
         project.update_project_status()
         return Response(FarmProjectSerializer(project).data)
+
+
+class ProjectFinancialSummaryView(APIView):
+    """
+    FINANCIAL PLANNER SUMMARY (Section 10, FIN-01 to FIN-12):
+    Returns real-time computed financial summary for the project:
+    estimates, commitments, incurred expenditure, advance payments,
+    partial payments, refunds, outstanding balances, overpayment balances,
+    budget variance, realized revenue, net surplus, and cost per acre.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        project = get_object_or_404(FarmProject, pk=pk)
+        if not (request.user.is_admin_role() or project.farmer == request.user or project.project_operations.filter(booking__provider=request.user).exists()):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(project.get_financial_summary())
+
+
+class ExpenseRecordListCreateView(APIView):
+    """
+    FIN-01, FIN-02, FIN-03:
+    Lists or records planned estimates, confirmed commitments, or incurred expenses.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if not (request.user.is_admin_role() or project.farmer == request.user or project.project_operations.filter(booking__provider=request.user).exists()):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        expenses = project.expenses.all().prefetch_related('adjustments')
+        return Response(ExpenseRecordSerializer(expenses, many=True).data)
+
+    def post(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only the farm project owner or admin can record expenses.'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ExpenseRecordSerializer(data=request.data)
+        if serializer.is_valid():
+            expense = serializer.save(project=project)
+            return Response(ExpenseRecordSerializer(expense).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PaymentRecordListCreateView(APIView):
+    """
+    FIN-04, FIN-05, FIN-06, FIN-11:
+    Lists and records payments (advance, partial, final, refund) against a farm project or specific expense.
+    Platform ledger recording only; live banking disabled.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if not (request.user.is_admin_role() or project.farmer == request.user or project.project_operations.filter(booking__provider=request.user).exists()):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        payments = project.payments.all()
+        return Response(PaymentRecordSerializer(payments, many=True).data)
+
+    def post(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role() and not project.project_operations.filter(booking__provider=request.user).exists():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = PaymentRecordSerializer(data=request.data)
+        if serializer.is_valid():
+            payer = request.user
+            payment = serializer.save(project=project, payer=payer)
+            return Response(PaymentRecordSerializer(payment).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RevenueRecordListCreateView(APIView):
+    """
+    FIN-12:
+    Lists and records crop harvest sales revenues for the farm project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if not (request.user.is_admin_role() or project.farmer == request.user):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        revenues = project.revenues.all()
+        return Response(RevenueRecordSerializer(revenues, many=True).data)
+
+    def post(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only project owner can record revenue.'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = RevenueRecordSerializer(data=request.data)
+        if serializer.is_valid():
+            rev = serializer.save(project=project)
+            return Response(RevenueRecordSerializer(rev).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FinancialAdjustmentCreateView(APIView):
+    """
+    FIN-09:
+    Creates an authorized adjustment against an expense record (penalties, rework credits, deductions).
+    Requires authorized reviewer (project owner or admin) and explicit reason.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, expense_pk):
+        expense = get_object_or_404(ExpenseRecord, pk=expense_pk)
+        if expense.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only project owner or admin can authorize adjustments.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = FinancialAdjustmentSerializer(data=request.data)
+        if serializer.is_valid():
+            adj = serializer.save(expense=expense, approved_by=request.user)
+            return Response(FinancialAdjustmentSerializer(adj).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

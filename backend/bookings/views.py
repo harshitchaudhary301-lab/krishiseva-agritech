@@ -288,6 +288,24 @@ class QuotationAcceptView(APIView):
                 notes=f"Farmer accepted Quote v{quote.quotation_version} total ₹{quote.quote_amount}. Resource tentatively reserved."
             )
 
+            # FIN-02: Confirmed commitment recorded in Farm Project Financial Planner
+            if service_req.farm_project:
+                from farm_projects.models import ExpenseRecord
+                cat = 'machinery'
+                if service_req.category and service_req.category.slug in ['labour', 'irrigation']:
+                    cat = service_req.category.slug
+                ExpenseRecord.objects.create(
+                    project=service_req.farm_project,
+                    booking=booking,
+                    category=cat,
+                    record_type='commitment',
+                    title=f"Quotation #{quote.id}: {service_req.title}",
+                    amount=booking.agreed_amount,
+                    status='active',
+                    notes=f"Accepted quotation v{quote.quotation_version} by provider {quote.provider.username}"
+                )
+                service_req.farm_project.update_project_status()
+
             Notification.objects.create(
                 recipient=quote.provider,
                 title="Quotation Accepted! Please Confirm Booking",
@@ -547,6 +565,24 @@ class BookingPartialCompletionView(APIView):
             )
 
             if booking.request.farm_project:
+                from farm_projects.models import ExpenseRecord
+                # FIN-08 / FIN-03: Fulfill commitment and record partial settlement incurred expense
+                ExpenseRecord.objects.filter(booking=booking, record_type='commitment').update(status='fulfilled')
+                cat = 'machinery'
+                if booking.request.category and booking.request.category.slug in ['labour', 'irrigation']:
+                    cat = booking.request.category.slug
+                ExpenseRecord.objects.update_or_create(
+                    project=booking.request.farm_project,
+                    booking=booking,
+                    record_type='incurred',
+                    defaults={
+                        'category': cat,
+                        'title': f"Partial Service {booking.reference_id}: {booking.request.title}",
+                        'amount': settlement_amt,
+                        'status': 'active',
+                        'notes': f"Partial completion recorded. Agreed settlement ₹{settlement_amt}."
+                    }
+                )
                 booking.request.farm_project.update_project_status()
 
             return Response({

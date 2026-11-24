@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class Farm(models.Model):
     farmer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='farms')
@@ -173,6 +174,83 @@ class FarmProject(models.Model):
         self.actual_cost = total_act
         self.save()
 
+    def get_financial_summary(self):
+        """
+        FINANCIAL PLANNER CALCULATION CONTRACT (Section 10, FIN-01 to FIN-12):
+        Separates estimates, commitments, incurred expenses, advance payments,
+        partial payments, refunds, outstanding balances, overpayments, and revenue.
+        Never combines estimates, commitments, and incurred expenses into a single total.
+        """
+        from decimal import Decimal
+
+        # 1. Planned estimates (FIN-01)
+        active_estimates = self.expenses.filter(record_type='estimate', status='active')
+        planned_estimates = sum([Decimal(str(e.amount)) for e in active_estimates], Decimal('0.00'))
+
+        # 2. Confirmed commitments (FIN-02)
+        active_commitments = self.expenses.filter(record_type='commitment', status='active')
+        confirmed_commitments = sum([Decimal(str(c.amount)) for c in active_commitments], Decimal('0.00'))
+
+        # 3. Incurred expenditure (FIN-03 & FIN-09)
+        active_incurred = self.expenses.filter(record_type='incurred', status='active')
+        incurred_base = sum([Decimal(str(i.amount)) for i in active_incurred], Decimal('0.00'))
+
+        # Include adjustments
+        adjustments_total = Decimal('0.00')
+        for inc in active_incurred:
+            for adj in inc.adjustments.all():
+                adjustments_total += Decimal(str(adj.amount))
+        incurred_expenditure = max(incurred_base + adjustments_total, Decimal('0.00'))
+
+        # 4. Payments (FIN-04, FIN-05, FIN-06, FIN-11)
+        project_payments = self.payments.all()
+        advances = sum([Decimal(str(p.amount)) for p in project_payments.filter(payment_type='advance')], Decimal('0.00'))
+        partials = sum([Decimal(str(p.amount)) for p in project_payments.filter(payment_type__in=['partial', 'final'])], Decimal('0.00'))
+        total_payments = advances + partials
+        refunds = sum([Decimal(str(p.amount)) for p in project_payments.filter(payment_type='refund')], Decimal('0.00'))
+        net_recorded_payments = max(total_payments - refunds, Decimal('0.00'))
+
+        # 5. Outstanding balance & Overpayment
+        # Outstanding balance = max(0, incurred_expenditure - net_recorded_payments)
+        outstanding_balance = max(Decimal('0.00'), incurred_expenditure - net_recorded_payments)
+        # Overpayment or refundable balance = max(0, net_recorded_payments - incurred_expenditure)
+        overpayment_balance = max(Decimal('0.00'), net_recorded_payments - incurred_expenditure)
+
+        # 6. Budget variance = Incurred - Planned
+        budget_variance = incurred_expenditure - planned_estimates
+
+        # 7. Realized revenue
+        revenues = self.revenues.all()
+        realized_revenue = sum([Decimal(str(r.total_realized_revenue)) for r in revenues], Decimal('0.00'))
+
+        # 8. Recorded surplus = Revenue - Incurred
+        recorded_surplus = realized_revenue - incurred_expenditure
+
+        # 9. Cost per acre
+        area = Decimal(str(self.target_area_acres or 0))
+        cost_per_acre = Decimal('0.00')
+        if area > Decimal('0.00'):
+            cost_per_acre = round(incurred_expenditure / area, 2)
+
+        return {
+            'planned_estimates': str(planned_estimates),
+            'confirmed_commitments': str(confirmed_commitments),
+            'incurred_expenditure': str(incurred_expenditure),
+            'recorded_advance_payments': str(advances),
+            'recorded_partial_payments': str(partials),
+            'total_recorded_payments': str(total_payments),
+            'refunds': str(refunds),
+            'net_recorded_payments': str(net_recorded_payments),
+            'outstanding_balance': str(outstanding_balance),
+            'overpayment_balance': str(overpayment_balance),
+            'budget_variance': str(budget_variance),
+            'realized_revenue': str(realized_revenue),
+            'recorded_surplus': str(recorded_surplus),
+            'cultivated_area_acres': str(area),
+            'cost_per_acre': str(cost_per_acre),
+            'economic_disclaimer': 'Recorded surplus reflects platform operational records; not a certified comprehensive economic audit.'
+        }
+
     def __str__(self):
         return f"{self.name} - {self.crop} ({self.target_area_acres} Acres) [{self.get_status_display()}]"
 
@@ -274,3 +352,126 @@ class ProjectService(models.Model):
 
     def __str__(self):
         return f"{self.project.name} -> {self.category.name_en}"
+
+
+class ExpenseRecord(models.Model):
+    """
+    FIN-01, FIN-02, FIN-03: Tracks planned estimates, confirmed commitments, and incurred expenses separately.
+    """
+    CATEGORY_CHOICES = [
+        ('seeds', 'Seed and Planting Material'),
+        ('inputs', 'Agricultural Inputs'),
+        ('labour', 'Hired Labour'),
+        ('machinery', 'Machinery Rental'),
+        ('irrigation', 'Irrigation'),
+        ('transportation', 'Transportation'),
+        ('storage', 'Storage'),
+        ('repair_maintenance', 'Repair and Maintenance'),
+        ('land_rent', 'Land Rent'),
+        ('expert_services', 'Expert and Other Services'),
+    ]
+
+    TYPE_CHOICES = [
+        ('estimate', 'Planned Estimate (Quotation/Budget)'),
+        ('commitment', 'Confirmed Commitment (Confirmed Booking)'),
+        ('incurred', 'Incurred Expense (Approved Completed Service)'),
+    ]
+
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('released', 'Released / Cancelled'),
+        ('settled', 'Settled'),
+        ('fulfilled', 'Fulfilled'),
+    ]
+
+    project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='expenses')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='labour')
+    record_type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='estimate')
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.SET_NULL, null=True, blank=True, related_name='booking_expenses')
+    title = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='active')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.project.name} | {self.get_record_type_display()}: ₹{self.amount} [{self.category}]"
+
+
+class FinancialAdjustment(models.Model):
+    """
+    FIN-09: Approved corrections create adjustment records rather than silently replacing original amounts.
+    """
+    expense = models.ForeignKey(ExpenseRecord, on_delete=models.CASCADE, related_name='adjustments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Adjustment delta (positive or negative).")
+    reason = models.TextField()
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Adjustment ₹{self.amount} on {self.expense.title}: {self.reason}"
+
+
+class PaymentRecord(models.Model):
+    """
+    FIN-04, FIN-05, FIN-06, FIN-11:
+    Tracks advance payments, partial payments, final settlements, and refunds.
+    Payments reduce outstanding balances, but never increase incurred expenses.
+    Platform ledger only; live banking transfers disabled in MVP.
+    """
+    PAYMENT_TYPE_CHOICES = [
+        ('advance', 'Advance Payment'),
+        ('partial', 'Partial Payment'),
+        ('final', 'Final Settlement'),
+        ('refund', 'Refund'),
+    ]
+
+    project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='payments')
+    expense = models.ForeignKey(ExpenseRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
+    payer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payments_made')
+    payee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments_received')
+    payment_type = models.CharField(max_length=30, choices=PAYMENT_TYPE_CHOICES, default='advance')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_mode = models.CharField(max_length=50, default='Direct UPI / Cash (Platform Ledger Recording)')
+    transaction_reference = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    payment_date = models.DateField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-payment_date', '-created_at']
+
+    def __str__(self):
+        return f"Payment {self.get_payment_type_display()}: ₹{self.amount} for {self.project.name}"
+
+
+class RevenueRecord(models.Model):
+    """
+    Tracks realized farm revenue from crop sales for surplus and gross margin calculation.
+    """
+    project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='revenues')
+    crop = models.CharField(max_length=100)
+    quantity_quintals = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_per_quintal = models.DecimalField(max_digits=10, decimal_places=2)
+    total_realized_revenue = models.DecimalField(max_digits=12, decimal_places=2)
+    buyer_name = models.CharField(max_length=200, blank=True, help_text="e.g. APMC Meerut Mandi Trader, Daurala Sugar Mill")
+    mandi_or_mill = models.CharField(max_length=200, blank=True)
+    sale_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sale_date']
+
+    def save(self, *args, **kwargs):
+        if not self.total_realized_revenue and self.quantity_quintals and self.rate_per_quintal:
+            self.total_realized_revenue = self.quantity_quintals * self.rate_per_quintal
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.project.name} | Revenue: ₹{self.total_realized_revenue} ({self.quantity_quintals} Qtl @ ₹{self.rate_per_quintal})"
+
