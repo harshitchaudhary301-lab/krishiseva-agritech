@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -266,3 +267,287 @@ class KrishiSevaCoreTests(TestCase):
         # Because services are not yet confirmed, status must NOT be 'ready'
         self.assertNotEqual(proj.status, 'ready')
         self.assertEqual(proj.status, 'planning')
+
+
+class ExactBookingRulesTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.cat = ServiceCategory.objects.create(
+            slug='harvesting', name_en='Harvesting & Collection', name_hi='कटाई', is_active=True
+        )
+        self.farmer = User.objects.create_user(
+            username='farmer_b', password='password123', role='farmer', village='Daurala', district='Meerut'
+        )
+        self.provider = User.objects.create_user(
+            username='provider_b', password='password123', role='provider', village='Daurala', district='Meerut'
+        )
+        ProviderProfile.objects.create(
+            user=self.provider, business_name='Meerut Harvesters',
+            service_categories='harvesting', verification_status='verified', is_available=True
+        )
+
+        self.suspended_provider = User.objects.create_user(
+            username='suspended_b', password='password123', role='provider', village='Daurala', district='Meerut'
+        )
+        ProviderProfile.objects.create(
+            user=self.suspended_provider, business_name='Suspended Agro',
+            service_categories='harvesting', verification_status='suspended', is_available=True
+        )
+
+        self.target_date = datetime.date.today() + datetime.timedelta(days=5)
+        self.req = ServiceRequest.objects.create(
+            farmer=self.farmer, category=self.cat, title='Wheat Combine Harvesting',
+            description='10 Acres wheat harvest', village='Daurala', district='Meerut',
+            required_date=self.target_date, scope_quantity='10 Acres'
+        )
+
+    def test_book_01_multiple_quotes_and_book_02_single_fulfillment(self):
+        """BOOK-01: Multiple quotes permitted. BOOK-02: Only one active accepted booking."""
+        p2 = User.objects.create_user(username='prov2', password='password123', role='provider')
+        ProviderProfile.objects.create(user=p2, business_name='P2', service_categories='harvesting', verification_status='verified')
+
+        q1 = Quotation.objects.create(
+            request=self.req, provider=self.provider, quantity=10, unit_price=180.0,
+            quote_amount=1800.0, proposed_schedule=self.target_date, status='pending'
+        )
+        q2 = Quotation.objects.create(
+            request=self.req, provider=p2, quantity=10, unit_price=170.0,
+            quote_amount=1700.0, proposed_schedule=self.target_date, status='pending'
+        )
+        # BOOK-01: Request has 2 quotes
+        self.assertEqual(self.req.quotations.count(), 2)
+
+        # Farmer accepts q1
+        self.client.force_authenticate(user=self.farmer)
+        res1 = self.client.post(f'/api/bookings/quotations/{q1.id}/accept/')
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+
+        # BOOK-02 & BOOK-06: Attempting to accept competing q2 is rejected with 409
+        res2 = self.client.post(f'/api/bookings/quotations/{q2.id}/accept/')
+        self.assertEqual(res2.status_code, status.HTTP_409_CONFLICT)
+
+    def test_book_04_version_validation_and_expiry(self):
+        """BOOK-04: Quote acceptance validates version and expiry."""
+        q = Quotation.objects.create(
+            request=self.req, provider=self.provider, quotation_version=2,
+            quote_amount=2000.0, proposed_schedule=self.target_date,
+            expiry_date=datetime.date.today() - datetime.timedelta(days=1), # Expired yesterday
+            status='pending'
+        )
+        self.client.force_authenticate(user=self.farmer)
+        # Attempt acceptance with mismatched expected_version
+        res_v = self.client.post(f'/api/bookings/quotations/{q.id}/accept/', {'expected_version': 1})
+        self.assertEqual(res_v.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('version mismatch', res_v.data['error'])
+
+        # Attempt acceptance with valid version but expired date
+        res_exp = self.client.post(f'/api/bookings/quotations/{q.id}/accept/', {'expected_version': 2})
+        self.assertEqual(res_exp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('expired', res_exp.data['error'])
+
+    def test_book_07_exclusive_resource_reservation_conflict(self):
+        """BOOK-07: Exclusive resources cannot have overlapping active reservations."""
+        # Create active booking for combine Harvester-01 on target_date
+        q1 = Quotation.objects.create(
+            request=self.req, provider=self.provider, quote_amount=2500.0,
+            proposed_schedule=self.target_date, status='accepted'
+        )
+        b1 = Booking.objects.create(
+            request=self.req, quotation=q1, farmer=self.farmer, provider=self.provider,
+            agreed_amount=2500.0, scheduled_date=self.target_date,
+            exclusive_resource_id='Harvester-01', status='confirmed'
+        )
+
+        # Second request
+        req2 = ServiceRequest.objects.create(
+            farmer=self.farmer, category=self.cat, title='Second Field',
+            description='5 acres', village='Daurala', district='Meerut',
+            required_date=self.target_date, scope_quantity='5 Acres'
+        )
+        q2 = Quotation.objects.create(
+            request=req2, provider=self.provider, quote_amount=1500.0,
+            proposed_schedule=self.target_date, status='pending'
+        )
+
+        self.client.force_authenticate(user=self.farmer)
+        # Attempt to accept q2 reserving the same Harvester-01 on same date
+        res = self.client.post(f'/api/bookings/quotations/{q2.id}/accept/', {
+            'exclusive_resource_id': 'Harvester-01'
+        })
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('Resource reservation conflict', res.data['error'])
+
+    def test_book_09_and_book_10_idempotency_keys(self):
+        """BOOK-09: Retried identical request returns existing result. BOOK-10: Reused key with different payload returns conflict."""
+        q = Quotation.objects.create(
+            request=self.req, provider=self.provider, quote_amount=3000.0,
+            proposed_schedule=self.target_date, status='pending'
+        )
+        self.client.force_authenticate(user=self.farmer)
+        idem_key = "idemp-booking-test-999"
+
+        payload1 = {'expected_version': 1, 'idempotency_key': idem_key}
+        res1 = self.client.post(f'/api/bookings/quotations/{q.id}/accept/', payload1)
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        booking_id = res1.data['booking_id']
+
+        # BOOK-09: Identical retry with same key
+        res_retry = self.client.post(f'/api/bookings/quotations/{q.id}/accept/', payload1)
+        self.assertEqual(res_retry.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_retry.data['booking_id'], booking_id)
+
+        # BOOK-10: Different payload with same key returns 409
+        payload_diff = {'expected_version': 2, 'idempotency_key': idem_key}
+        res_conflict = self.client.post(f'/api/bookings/quotations/{q.id}/accept/', payload_diff)
+        self.assertEqual(res_conflict.status_code, status.HTTP_409_CONFLICT)
+
+    def test_book_12_additional_charges_require_farmer_approval(self):
+        """BOOK-12: Additional charges require explicit farmer approval."""
+        q = Quotation.objects.create(
+            request=self.req, provider=self.provider, quote_amount=3000.0,
+            proposed_schedule=self.target_date, status='accepted'
+        )
+        booking = Booking.objects.create(
+            request=self.req, quotation=q, farmer=self.farmer, provider=self.provider,
+            agreed_amount=3000.0, scheduled_date=self.target_date, status='in_progress'
+        )
+
+        # Provider requests additional charge of 500 for excessive stone damage
+        self.client.force_authenticate(user=self.provider)
+        res_req = self.client.post(f'/api/bookings/{booking.id}/additional-charge/', {
+            'action': 'request',
+            'amount': '500.00',
+            'reason': 'Excessive stone obstruction required extra blade change'
+        })
+        self.assertEqual(res_req.status_code, status.HTTP_201_CREATED)
+        charge_id = res_req.data['id']
+
+        # Booking agreed amount has NOT increased yet (still 3000)
+        booking.refresh_from_db()
+        self.assertEqual(booking.agreed_amount, Decimal('3000.00'))
+
+        # Farmer approves additional charge
+        self.client.force_authenticate(user=self.farmer)
+        res_app = self.client.post(f'/api/bookings/{booking.id}/additional-charge/', {
+            'action': 'approve',
+            'charge_id': charge_id
+        })
+        self.assertEqual(res_app.status_code, status.HTTP_200_OK)
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.agreed_amount, Decimal('3500.00'))
+
+    def test_book_13_failed_rescheduling_preserves_original_reservation(self):
+        """BOOK-13: Failed rescheduling must preserve original valid reservation."""
+        orig_date = self.target_date
+        conflict_date = self.target_date + datetime.timedelta(days=1)
+
+        # Confirmed booking on orig_date
+        q1 = Quotation.objects.create(
+            request=self.req, provider=self.provider, quote_amount=2000.0,
+            proposed_schedule=orig_date, status='accepted'
+        )
+        b1 = Booking.objects.create(
+            request=self.req, quotation=q1, farmer=self.farmer, provider=self.provider,
+            agreed_amount=2000.0, scheduled_date=orig_date, status='confirmed'
+        )
+
+        # Provider already has a confirmed booking on conflict_date
+        req_other = ServiceRequest.objects.create(
+            farmer=self.farmer, category=self.cat, title='Other Req',
+            description='...', village='Daurala', district='Meerut',
+            required_date=conflict_date, scope_quantity='1'
+        )
+        q_other = Quotation.objects.create(
+            request=req_other, provider=self.provider, quote_amount=1000.0,
+            proposed_schedule=conflict_date, status='accepted'
+        )
+        Booking.objects.create(
+            request=req_other, quotation=q_other, farmer=self.farmer, provider=self.provider,
+            agreed_amount=1000.0, scheduled_date=conflict_date, status='confirmed'
+        )
+
+        self.client.force_authenticate(user=self.farmer)
+        # Attempt to reschedule b1 to conflict_date
+        res_resched = self.client.post(f'/api/bookings/{b1.id}/reschedule/', {
+            'new_date': str(conflict_date)
+        })
+        self.assertEqual(res_resched.status_code, status.HTTP_409_CONFLICT)
+
+        # Original reservation is preserved
+        b1.refresh_from_db()
+        self.assertEqual(b1.scheduled_date, orig_date)
+
+    def test_book_15_suspended_provider_cannot_quote_or_book(self):
+        """BOOK-15: Suspended providers cannot quote or confirm bookings."""
+        self.client.force_authenticate(user=self.suspended_provider)
+        res = self.client.post('/api/bookings/quotations/', {
+            'request': self.req.id,
+            'quantity': 10,
+            'unit_price': 200.0,
+            'proposed_schedule': str(self.target_date)
+        })
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('Suspended', res.data['error'])
+
+    def test_book_18_partial_completion_workflow(self):
+        """BOOK-18: Partial completion requires recorded completed quantity and agreed settlement."""
+        q = Quotation.objects.create(
+            request=self.req, provider=self.provider, quote_amount=3000.0,
+            proposed_schedule=self.target_date, status='accepted'
+        )
+        booking = Booking.objects.create(
+            request=self.req, quotation=q, farmer=self.farmer, provider=self.provider,
+            agreed_amount=3000.0, scheduled_date=self.target_date, status='in_progress'
+        )
+
+        self.client.force_authenticate(user=self.farmer)
+        res = self.client.post(f'/api/bookings/{booking.id}/partial-completion/', {
+            'completed_quantity': '6 of 10 Acres completed before severe rain',
+            'agreed_settlement_amount': '1800.00',
+            'reason': 'Field flooded by unseasonal rain; mutual agreement to conclude'
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'partially_completed')
+        self.assertEqual(booking.agreed_amount, Decimal('1800.00'))
+        self.assertTrue(hasattr(booking, 'partial_completion'))
+        self.assertEqual(booking.partial_completion.agreed_settlement_amount, Decimal('1800.00'))
+
+    def test_book_19_completion_submission_and_farmer_approval(self):
+        """BOOK-19: Provider submits completion -> completion_pending -> farmer approves -> completed."""
+        q = Quotation.objects.create(
+            request=self.req, provider=self.provider, quote_amount=3000.0,
+            proposed_schedule=self.target_date, status='accepted'
+        )
+        booking = Booking.objects.create(
+            request=self.req, quotation=q, farmer=self.farmer, provider=self.provider,
+            agreed_amount=3000.0, scheduled_date=self.target_date, status='in_progress'
+        )
+
+        # 1. Provider declares completion
+        self.client.force_authenticate(user=self.provider)
+        res_sub = self.client.post(f'/api/bookings/{booking.id}/submit-completion/', {
+            'notes': 'Completed full 10-acre harvesting with zero grain spill.'
+        })
+        self.assertEqual(res_sub.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'completion_pending')
+
+        # 2. Farmer confirms and approves
+        self.client.force_authenticate(user=self.farmer)
+        res_app = self.client.post(f'/api/bookings/{booking.id}/confirm-completion/', {
+            'approved': True
+        })
+        self.assertEqual(res_app.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'completed')
+        self.assertIsNotNone(booking.completed_at)
+        self.assertEqual(booking.request.status, 'completed')
+
+        # BOOK-20: Events logged
+        events = booking.events.all()
+        action_names = [e.action for e in events]
+        self.assertIn('Submitted Completion', action_names)
+        self.assertIn('Farmer Approved Completion', action_names)
+

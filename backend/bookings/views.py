@@ -1,3 +1,6 @@
+import json
+import hashlib
+from decimal import Decimal
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -5,12 +8,18 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from .models import ServiceRequest, Quotation, Booking, BookingEvent, Complaint, Notification
+from .models import (
+    ServiceRequest, Quotation, Booking, BookingEvent, Complaint,
+    Notification, ResourceReservation, IdempotencyKey,
+    AdditionalChargeRequest, PartialCompletionRecord
+)
 from .serializers import (
     ServiceRequestSerializer, QuotationSerializer,
-    BookingSerializer, ComplaintSerializer, NotificationSerializer
+    BookingSerializer, BookingEventSerializer, ComplaintSerializer,
+    NotificationSerializer, AdditionalChargeRequestSerializer,
+    PartialCompletionRecordSerializer, QuoteAcceptanceRequestSerializer
 )
-from matching.matcher import find_backup_providers, find_matching_providers
+from matching.matcher import find_backup_providers
 
 class RequestListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -18,21 +27,16 @@ class RequestListCreateView(APIView):
     def get(self, request):
         user = request.user
         if user.is_farmer():
-            # Farmer sees their own requests
             requests = ServiceRequest.objects.filter(farmer=user).order_by('-created_at')
         elif user.is_worker():
-            # Workers see open labour requests in their district/state
             requests = ServiceRequest.objects.filter(
                 category__slug='labour',
                 status='open'
             ).order_by('-created_at')
         elif user.is_provider():
-            # Providers see open requests for categories they provide
             categories_offered = []
             if hasattr(user, 'provider_profile') and user.provider_profile.service_categories:
                 categories_offered = [c.strip().lower() for c in user.provider_profile.service_categories.split(',')]
-            
-            # Also check ProviderService table
             from_services = list(user.services.filter(is_active=True).values_list('category__slug', flat=True))
             all_slugs = list(set(categories_offered + from_services))
 
@@ -43,8 +47,10 @@ class RequestListCreateView(APIView):
                 ).order_by('-created_at')
             else:
                 requests = ServiceRequest.objects.filter(status='open').order_by('-created_at')
-        else:
+        elif user.is_admin_role():
             requests = ServiceRequest.objects.all().order_by('-created_at')
+        else:
+            requests = ServiceRequest.objects.none()
 
         serializer = ServiceRequestSerializer(requests, many=True)
         return Response(serializer.data)
@@ -80,10 +86,16 @@ class RequestListCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class RequestDetailView(generics.RetrieveAPIView):
+class RequestDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    queryset = ServiceRequest.objects.all()
-    serializer_class = ServiceRequestSerializer
+
+    def get(self, request, pk):
+        service_req = get_object_or_404(ServiceRequest, pk=pk)
+        user = request.user
+        # Strict object-level permission
+        if not (user.is_admin_role() or service_req.farmer == user or user.is_provider() or user.is_worker()):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(ServiceRequestSerializer(service_req).data)
 
 
 class RequestCancelView(APIView):
@@ -107,12 +119,30 @@ class RequestCancelView(APIView):
 
 
 class QuotationCreateView(APIView):
+    """
+    BOOK-01: Multiple quotes can be submitted for a service request.
+    BOOK-15: Suspended providers cannot submit quotations.
+    Unverified providers cannot submit quotations.
+    Server calculates total amount; client values cannot override server calculations.
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         user = request.user
         if not (user.is_worker() or user.is_provider() or user.is_superuser):
             return Response({'error': 'Only providers and workers can submit quotations.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check verification & suspension (BOOK-15)
+        if hasattr(user, 'provider_profile'):
+            if user.provider_profile.is_suspended():
+                return Response({'error': 'Suspended providers cannot submit quotations (BOOK-15).'}, status=status.HTTP_403_FORBIDDEN)
+            if not user.provider_profile.is_verified() and not user.is_superuser:
+                return Response({'error': 'Your provider profile is pending verification. Only verified providers can quote.'}, status=status.HTTP_403_FORBIDDEN)
+        elif hasattr(user, 'worker_profile'):
+            if user.worker_profile.is_suspended():
+                return Response({'error': 'Suspended workers cannot submit quotations (BOOK-15).'}, status=status.HTTP_403_FORBIDDEN)
+            if not user.worker_profile.is_verified() and not user.is_superuser:
+                return Response({'error': 'Your worker profile is pending verification. Only verified workers can quote.'}, status=status.HTTP_403_FORBIDDEN)
 
         request_id = request.data.get('request')
         service_req = get_object_or_404(ServiceRequest, pk=request_id)
@@ -127,13 +157,13 @@ class QuotationCreateView(APIView):
 
         serializer = QuotationSerializer(data=request.data)
         if serializer.is_valid():
+            # Server derives quote_amount automatically via model calculate_total()
             quote = serializer.save(provider=user)
 
-            # Notify farmer
             Notification.objects.create(
                 recipient=service_req.farmer,
                 title="New Quotation Received!",
-                message=f"{user.get_full_name() or user.username} submitted a quote of ₹{quote.quote_amount} for '{service_req.title}'.",
+                message=f"{user.get_full_name() or user.username} submitted Quote v{quote.quotation_version} of ₹{quote.quote_amount} for '{service_req.title}'.",
                 link_url=f"/farmer/requests/{service_req.id}"
             )
 
@@ -142,30 +172,85 @@ class QuotationCreateView(APIView):
 
 
 class QuotationAcceptView(APIView):
+    """
+    CRITICAL QUOTATION ACCEPTANCE CONTRACT:
+    - BOOK-02: Only one active accepted booking may fulfil an individual service request.
+    - BOOK-04: Validates current quotation version and expiry.
+    - BOOK-05 & BOOK-07: Successful exclusive/shared resource reservation.
+    - BOOK-06: Concurrency protection via select_for_update().
+    - BOOK-09 & BOOK-10: Idempotency enforcement.
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        quote = get_object_or_404(Quotation, pk=pk)
-        service_req = quote.request
+        user = request.user
+        idempotency_key = request.data.get('idempotency_key', '')
+        expected_version = int(request.data.get('expected_version', 1))
+        exclusive_res_id = request.data.get('exclusive_resource_id', '')
 
-        if service_req.farmer != request.user and not request.user.is_superuser:
-            return Response({'error': 'Only the request owner can accept quotations.'}, status=status.HTTP_403_FORBIDDEN)
-
-        if service_req.status != 'open':
-            return Response({'error': f'Request cannot accept quotation in status {service_req.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+        # BOOK-09 & BOOK-10: Check Idempotency
+        if idempotency_key:
+            req_hash = hashlib.sha256(json.dumps(request.data, sort_keys=True, default=str).encode('utf-8')).hexdigest()
+            cached = IdempotencyKey.objects.filter(key=idempotency_key).first()
+            if cached:
+                if cached.request_hash == req_hash:
+                    # BOOK-09: Identical retried request returns existing result
+                    return Response(cached.response_data, status=cached.response_status)
+                else:
+                    # BOOK-10: Reusing idempotency key with different content returns conflict
+                    return Response({
+                        'error': 'Conflict: Idempotency key reused with different request payload (BOOK-10).'
+                    }, status=status.HTTP_409_CONFLICT)
 
         with transaction.atomic():
+            quote = Quotation.objects.select_for_update().filter(pk=pk).first()
+            if not quote:
+                return Response({'error': 'Quotation not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            service_req = ServiceRequest.objects.select_for_update().get(pk=quote.request_id)
+
+            if service_req.farmer != user and not user.is_superuser:
+                return Response({'error': 'Only the request owner can accept quotations.'}, status=status.HTTP_403_FORBIDDEN)
+
+            # BOOK-02 & BOOK-06: Check that request is still open
+            if service_req.status != 'open':
+                return Response({
+                    'error': f"Conflict: Service request is already in status '{service_req.status}'. Only one active booking may fulfil a request (BOOK-02, BOOK-06)."
+                }, status=status.HTTP_409_CONFLICT)
+
+            # BOOK-04: Validate quotation version
+            if quote.quotation_version != expected_version:
+                return Response({
+                    'error': f"Quotation version mismatch: expected v{expected_version}, but quotation is v{quote.quotation_version} (BOOK-04)."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # BOOK-04: Validate quotation expiry
+            if quote.is_expired():
+                quote.status = 'expired'
+                quote.save()
+                return Response({'error': 'Quotation has expired and can no longer be accepted (BOOK-04).'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # BOOK-15: Check provider suspension
+            if hasattr(quote.provider, 'provider_profile') and quote.provider.provider_profile.is_suspended():
+                return Response({'error': 'Cannot accept quote: Provider is currently suspended (BOOK-15).'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # BOOK-07: Check exclusive resource reservation
+            if Booking.check_double_booking(quote.provider_id, quote.proposed_schedule, exclusive_resource_id=exclusive_res_id):
+                return Response({
+                    'error': f"Resource reservation conflict: Exclusive resource or provider already booked for {quote.proposed_schedule} (BOOK-07)."
+                }, status=status.HTTP_409_CONFLICT)
+
+            # Accept quotation
             quote.status = 'accepted'
             quote.save()
 
-            # Mark other quotes for this request as rejected
+            # Reject other competing quotes for this request
             service_req.quotations.exclude(id=quote.id).update(status='rejected')
 
             service_req.status = 'quote_accepted'
             service_req.save()
 
-            # Create Booking in pending_confirmation state
-            # A farmer must not be able to confirm a provider's booking without the provider's agreement!
+            # Create Booking
             booking = Booking.objects.create(
                 request=service_req,
                 quotation=quote,
@@ -173,30 +258,69 @@ class QuotationAcceptView(APIView):
                 provider=quote.provider,
                 agreed_amount=quote.quote_amount,
                 scheduled_date=quote.proposed_schedule,
+                confirmed_window_start=quote.proposed_service_window_start or quote.proposed_schedule,
+                confirmed_window_end=quote.proposed_service_window_end or quote.proposed_schedule,
+                exclusive_resource_id=exclusive_res_id,
                 status='pending_confirmation'
             )
 
-            BookingEvent.objects.create(
+            # Create tentative resource reservation
+            res_record, _ = ResourceReservation.objects.update_or_create(
                 booking=booking,
-                actor=request.user,
-                action='Quotation Selected',
-                from_status='',
-                to_status='pending_confirmation',
-                notes=f"Farmer accepted quote of ₹{quote.quote_amount}. Awaiting provider confirmation."
+                defaults={
+                    'provider': quote.provider,
+                    'resource_type': 'exclusive' if exclusive_res_id else 'shared',
+                    'resource_identifier': exclusive_res_id or f"Provider-{quote.provider_id}",
+                    'date': quote.proposed_schedule,
+                    'allocated_quantity': 1,
+                    'max_capacity': 1,
+                    'is_active': True
+                }
             )
 
-            # Notify provider to confirm availability
+            # Record event (BOOK-20)
+            BookingEvent.objects.create(
+                booking=booking,
+                actor=user,
+                action='Quotation Accepted',
+                from_status='',
+                to_status='pending_confirmation',
+                notes=f"Farmer accepted Quote v{quote.quotation_version} total ₹{quote.quote_amount}. Resource tentatively reserved."
+            )
+
             Notification.objects.create(
                 recipient=quote.provider,
-                title="Action Required: Quotation Accepted!",
-                message=f"Farmer {request.user.get_full_name() or request.user.username} accepted your quote for '{service_req.title}'. Please confirm your booking availability.",
+                title="Quotation Accepted! Please Confirm Booking",
+                message=f"Farmer {user.get_full_name() or user.username} accepted your Quote v{quote.quotation_version} for '{service_req.title}'. Confirm availability.",
                 link_url="/provider/bookings"
             )
 
-            return Response({
-                'message': 'Quotation accepted. Booking created in pending confirmation state.',
+            response_payload = {
+                'message': 'Quotation successfully accepted. Booking created in pending confirmation state.',
+                'booking_id': booking.id,
+                'reference_id': booking.reference_id,
+                'confirmed_booking_status': booking.status,
+                'accepted_total': str(booking.agreed_amount),
+                'currency': 'INR',
+                'confirmed_service_window': {
+                    'start_date': str(booking.confirmed_window_start),
+                    'end_date': str(booking.confirmed_window_end)
+                },
+                'reservation_identifier': res_record.resource_identifier,
                 'booking': BookingSerializer(booking).data
-            })
+            }
+
+            # Cache idempotency record if key was provided
+            if idempotency_key:
+                IdempotencyKey.objects.create(
+                    key=idempotency_key,
+                    user=user,
+                    request_hash=hashlib.sha256(json.dumps(request.data, sort_keys=True, default=str).encode('utf-8')).hexdigest(),
+                    response_data=response_payload,
+                    response_status=200
+                )
+
+            return Response(response_payload, status=status.HTTP_200_OK)
 
 
 class BookingListView(APIView):
@@ -208,17 +332,24 @@ class BookingListView(APIView):
             bookings = Booking.objects.filter(farmer=user).order_by('-created_at')
         elif user.is_worker() or user.is_provider():
             bookings = Booking.objects.filter(provider=user).order_by('-created_at')
-        else:
+        elif user.is_admin_role():
             bookings = Booking.objects.all().order_by('-created_at')
+        else:
+            bookings = Booking.objects.none()
 
         serializer = BookingSerializer(bookings, many=True)
         return Response(serializer.data)
 
 
-class BookingDetailView(generics.RetrieveAPIView):
+class BookingDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Booking.objects.all()
-    serializer_class = BookingSerializer
+
+    def get(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        user = request.user
+        if not (user.is_admin_role() or booking.farmer == user or booking.provider == user):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(BookingSerializer(booking).data)
 
 
 class BookingConfirmView(APIView):
@@ -246,8 +377,8 @@ class BookingStatusUpdateView(APIView):
 
         valid_transitions = {
             'confirmed': ['scheduled', 'in_progress', 'cancelled_by_farmer', 'cancelled_by_provider'],
-            'scheduled': ['in_progress', 'completed', 'cancelled_by_farmer', 'cancelled_by_provider'],
-            'in_progress': ['completed'],
+            'scheduled': ['in_progress', 'cancelled_by_farmer', 'cancelled_by_provider'],
+            'in_progress': ['completion_pending'],
         }
 
         if new_status not in valid_transitions.get(booking.status, []):
@@ -255,19 +386,6 @@ class BookingStatusUpdateView(APIView):
 
         from_status = booking.status
         booking.status = new_status
-        if new_status == 'completed':
-            booking.completed_at = timezone.now()
-            booking.request.status = 'completed'
-            booking.request.save()
-
-            # Increment provider/worker completed count
-            if hasattr(booking.provider, 'worker_profile'):
-                booking.provider.worker_profile.completed_jobs_count += 1
-                booking.provider.worker_profile.save()
-            elif hasattr(booking.provider, 'provider_profile'):
-                booking.provider.provider_profile.completed_bookings_count += 1
-                booking.provider.provider_profile.save()
-
         booking.save()
 
         BookingEvent.objects.create(
@@ -286,6 +404,211 @@ class BookingStatusUpdateView(APIView):
             'message': f"Booking status updated to '{new_status}'.",
             'booking': BookingSerializer(booking).data
         })
+
+
+class BookingCompletionSubmitView(APIView):
+    """
+    BOOK-19: Provider submits service completion. Sets status to 'completion_pending'.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        notes = request.data.get('notes', 'Provider declared service completed.')
+        try:
+            updated = booking.submit_completion(request.user, notes=notes)
+            return Response({
+                'message': 'Service completion submitted. Awaiting farmer inspection & approval.',
+                'booking': BookingSerializer(updated).data
+            })
+        except ValidationError as e:
+            return Response({'error': str(e.message if hasattr(e, 'message') else e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BookingCompletionConfirmView(APIView):
+    """
+    BOOK-19: Farmer confirms completed work or raises dispute.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        is_approved = request.data.get('approved', True)
+        reason = request.data.get('reason', '')
+        try:
+            confirmed = booking.confirm_completion_by_farmer(request.user, is_approved=is_approved, dispute_reason=reason)
+            return Response({
+                'message': 'Service completion decision recorded.',
+                'booking': BookingSerializer(confirmed).data
+            })
+        except ValidationError as e:
+            return Response({'error': str(e.message if hasattr(e, 'message') else e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BookingAdditionalChargeView(APIView):
+    """
+    BOOK-12: Additional charges require explicit farmer approval.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        action = request.data.get('action', 'request')
+
+        if action == 'request':
+            if booking.provider != request.user and not request.user.is_superuser:
+                return Response({'error': 'Only the assigned provider can request additional charges.'}, status=status.HTTP_403_FORBIDDEN)
+            amount = Decimal(str(request.data.get('amount', '0.00')))
+            reason = request.data.get('reason', '')
+            if amount <= 0:
+                return Response({'error': 'Additional charge amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+            charge = AdditionalChargeRequest.objects.create(
+                booking=booking,
+                requested_by=request.user,
+                amount=amount,
+                reason=reason
+            )
+            Notification.objects.create(
+                recipient=booking.farmer,
+                title="Additional Charge Approval Required",
+                message=f"Provider requested additional charge of ₹{amount} on {booking.reference_id}: {reason}.",
+                link_url="/farmer/bookings"
+            )
+            return Response(AdditionalChargeRequestSerializer(charge).data, status=status.HTTP_201_CREATED)
+
+        elif action in ['approve', 'reject']:
+            if booking.farmer != request.user and not request.user.is_superuser:
+                return Response({'error': 'Only the farmer can approve or reject additional charges.'}, status=status.HTTP_403_FORBIDDEN)
+            charge_id = request.data.get('charge_id')
+            charge = get_object_or_404(AdditionalChargeRequest, pk=charge_id, booking=booking)
+            charge.status = 'approved' if action == 'approve' else 'rejected'
+            charge.resolved_at = timezone.now()
+            charge.save()
+
+            if action == 'approve':
+                # Increase booking agreed amount
+                booking.agreed_amount += charge.amount
+                booking.save()
+                BookingEvent.objects.create(
+                    booking=booking,
+                    actor=request.user,
+                    action='Approved Additional Charge',
+                    from_status=booking.status,
+                    to_status=booking.status,
+                    notes=f"Farmer approved additional charge of ₹{charge.amount}: {charge.reason}"
+                )
+
+            return Response(AdditionalChargeRequestSerializer(charge).data)
+        return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BookingPartialCompletionView(APIView):
+    """
+    BOOK-18: Partial completion requires recorded completed quantity and agreed settlement.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        user = request.user
+        if not (booking.farmer == user or booking.provider == user or user.is_superuser):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        completed_qty = request.data.get('completed_quantity', '')
+        settlement_amt = Decimal(str(request.data.get('agreed_settlement_amount', '0.00')))
+        reason = request.data.get('reason', '')
+
+        with transaction.atomic():
+            booking.status = 'partially_completed'
+            booking.agreed_amount = settlement_amt
+            booking.completed_at = timezone.now()
+            booking.save()
+
+            record, _ = PartialCompletionRecord.objects.update_or_create(
+                booking=booking,
+                defaults={
+                    'completed_quantity': completed_qty,
+                    'agreed_settlement_amount': settlement_amt,
+                    'reason': reason,
+                    'confirmed_by_farmer': True
+                }
+            )
+
+            # Release resource reservation (BOOK-14)
+            ResourceReservation.objects.filter(booking=booking).update(is_active=False)
+
+            BookingEvent.objects.create(
+                booking=booking,
+                actor=user,
+                action='Recorded Partial Completion',
+                from_status='',
+                to_status='partially_completed',
+                notes=f"Partial settlement ₹{settlement_amt} for '{completed_qty}': {reason}"
+            )
+
+            if booking.request.farm_project:
+                booking.request.farm_project.update_project_status()
+
+            return Response({
+                'message': 'Partial completion successfully recorded.',
+                'booking': BookingSerializer(booking).data,
+                'partial_record': PartialCompletionRecordSerializer(record).data
+            })
+
+
+class BookingRescheduleView(APIView):
+    """
+    BOOK-13: Failed rescheduling must preserve the original valid reservation.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        user = request.user
+        if not (booking.farmer == user or booking.provider == user or user.is_superuser):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        new_date_str = request.data.get('new_date')
+        if not new_date_str:
+            return Response({'error': 'Please provide new_date.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            locked = Booking.objects.select_for_update().get(id=booking.id)
+            # Check if provider has conflict on new date
+            conflict = Booking.check_double_booking(
+                locked.provider_id,
+                new_date_str,
+                exclude_booking_id=locked.id,
+                exclusive_resource_id=locked.exclusive_resource_id
+            )
+            if conflict:
+                # Failed rescheduling preserves original reservation (BOOK-13)
+                return Response({
+                    'error': f"Rescheduling failed: Provider or resource is unavailable on {new_date_str}. Original reservation for {locked.scheduled_date} is preserved (BOOK-13)."
+                }, status=status.HTTP_409_CONFLICT)
+
+            old_date = locked.scheduled_date
+            locked.scheduled_date = new_date_str
+            locked.confirmed_window_start = new_date_str
+            locked.confirmed_window_end = new_date_str
+            locked.save()
+
+            # Update reservation record
+            ResourceReservation.objects.filter(booking=locked).update(date=new_date_str)
+
+            BookingEvent.objects.create(
+                booking=locked,
+                actor=user,
+                action='Rescheduled Booking',
+                from_status=locked.status,
+                to_status=locked.status,
+                notes=f"Rescheduled from {old_date} to {new_date_str}."
+            )
+
+            return Response({
+                'message': f"Booking successfully rescheduled to {new_date_str}.",
+                'booking': BookingSerializer(locked).data
+            })
 
 
 class BookingCancelView(APIView):
@@ -349,6 +672,5 @@ class NotificationListView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        # Mark all as read
         Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({'message': 'All notifications marked as read'})

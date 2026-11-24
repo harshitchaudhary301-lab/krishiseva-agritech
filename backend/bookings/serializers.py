@@ -1,7 +1,10 @@
 from rest_framework import serializers
-from .models import ServiceRequest, Quotation, Booking, BookingEvent, Complaint, Notification
+from .models import (
+    ServiceRequest, Quotation, Booking, BookingEvent, Complaint,
+    Notification, ResourceReservation, IdempotencyKey,
+    AdditionalChargeRequest, PartialCompletionRecord
+)
 from services.serializers import ServiceCategorySerializer
-from accounts.serializers import UserSerializer
 
 class QuotationSerializer(serializers.ModelSerializer):
     provider_name = serializers.CharField(source='provider.get_full_name', read_only=True)
@@ -10,14 +13,19 @@ class QuotationSerializer(serializers.ModelSerializer):
     provider_village = serializers.CharField(source='provider.village', read_only=True)
     provider_rating = serializers.SerializerMethodField()
     provider_completed_jobs = serializers.SerializerMethodField()
+    is_expired = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Quotation
         fields = [
             'id', 'request', 'provider', 'provider_name', 'provider_username',
             'provider_phone', 'provider_village', 'provider_rating',
-            'provider_completed_jobs', 'quote_amount', 'price_breakdown',
-            'notes', 'proposed_schedule', 'status', 'created_at'
+            'provider_completed_jobs', 'quotation_version', 'quantity', 'billing_unit',
+            'unit_price', 'itemized_charges', 'agreed_discount', 'quote_amount',
+            'price_breakdown', 'notes', 'proposed_schedule',
+            'proposed_service_window_start', 'proposed_service_window_end',
+            'expiry_date', 'included_services', 'excluded_services',
+            'cancellation_conditions', 'is_expired', 'status', 'created_at'
         ]
         read_only_fields = ['provider', 'created_at']
 
@@ -64,6 +72,28 @@ class BookingEventSerializer(serializers.ModelSerializer):
         fields = ['id', 'actor', 'actor_name', 'action', 'from_status', 'to_status', 'notes', 'timestamp']
 
 
+class AdditionalChargeRequestSerializer(serializers.ModelSerializer):
+    requested_by_name = serializers.CharField(source='requested_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = AdditionalChargeRequest
+        fields = [
+            'id', 'booking', 'requested_by', 'requested_by_name',
+            'amount', 'reason', 'status', 'resolved_at', 'created_at'
+        ]
+        read_only_fields = ['requested_by', 'status', 'resolved_at', 'created_at']
+
+
+class PartialCompletionRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PartialCompletionRecord
+        fields = [
+            'id', 'booking', 'completed_quantity', 'agreed_settlement_amount',
+            'reason', 'confirmed_by_farmer', 'timestamp'
+        ]
+        read_only_fields = ['timestamp']
+
+
 class BookingSerializer(serializers.ModelSerializer):
     farmer_name = serializers.CharField(source='farmer.get_full_name', read_only=True)
     farmer_phone = serializers.CharField(source='farmer.phone', read_only=True)
@@ -76,6 +106,8 @@ class BookingSerializer(serializers.ModelSerializer):
     request_title = serializers.CharField(source='request.title', read_only=True)
     request_scope = serializers.CharField(source='request.scope_quantity', read_only=True)
     events = BookingEventSerializer(many=True, read_only=True)
+    additional_charges = AdditionalChargeRequestSerializer(many=True, read_only=True)
+    partial_completion = PartialCompletionRecordSerializer(read_only=True)
 
     class Meta:
         model = Booking
@@ -84,10 +116,23 @@ class BookingSerializer(serializers.ModelSerializer):
             'farmer_name', 'farmer_phone', 'farmer_village',
             'provider', 'provider_name', 'provider_phone', 'provider_village',
             'category_name', 'category_slug', 'request_title', 'request_scope',
-            'agreed_amount', 'scheduled_date', 'status', 'cancellation_reason',
-            'completed_at', 'events', 'created_at', 'updated_at'
+            'agreed_amount', 'scheduled_date', 'confirmed_window_start',
+            'confirmed_window_end', 'exclusive_resource_id', 'status',
+            'cancellation_reason', 'completion_notes', 'completed_at',
+            'events', 'additional_charges', 'partial_completion',
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['reference_id', 'farmer', 'provider', 'agreed_amount', 'scheduled_date', 'status', 'created_at', 'updated_at']
+        read_only_fields = [
+            'reference_id', 'farmer', 'provider', 'agreed_amount',
+            'scheduled_date', 'status', 'created_at', 'updated_at'
+        ]
+
+
+class QuoteAcceptanceRequestSerializer(serializers.Serializer):
+    quotation_id = serializers.IntegerField(required=True)
+    expected_version = serializers.IntegerField(required=False, default=1)
+    idempotency_key = serializers.CharField(required=False, max_length=100, allow_blank=True)
+    exclusive_resource_id = serializers.CharField(required=False, max_length=100, allow_blank=True)
 
 
 class ComplaintSerializer(serializers.ModelSerializer):

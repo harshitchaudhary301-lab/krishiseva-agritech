@@ -4,6 +4,9 @@ from .views import (
     QuotationCreateView, QuotationAcceptView,
     BookingListView, BookingDetailView, BookingConfirmView,
     BookingStatusUpdateView, BookingCancelView, BackupProvidersView,
+    BookingRescheduleView, BookingCompletionSubmitView,
+    BookingCompletionConfirmView, BookingAdditionalChargeView,
+    BookingPartialCompletionView,
     ComplaintListCreateView, NotificationListView
 )
 
@@ -22,6 +25,11 @@ urlpatterns = [
     path('<int:pk>/', BookingDetailView.as_view(), name='booking-detail'),
     path('<int:pk>/confirm/', BookingConfirmView.as_view(), name='booking-confirm'),
     path('<int:pk>/status/', BookingStatusUpdateView.as_view(), name='booking-status'),
+    path('<int:pk>/submit-completion/', BookingCompletionSubmitView.as_view(), name='booking-submit-completion'),
+    path('<int:pk>/confirm-completion/', BookingCompletionConfirmView.as_view(), name='booking-confirm-completion'),
+    path('<int:pk>/additional-charge/', BookingAdditionalChargeView.as_view(), name='booking-additional-charge'),
+    path('<int:pk>/partial-completion/', BookingPartialCompletionView.as_view(), name='booking-partial-completion'),
+    path('<int:pk>/reschedule/', BookingRescheduleView.as_view(), name='booking-reschedule'),
     path('<int:pk>/cancel/', BookingCancelView.as_view(), name='booking-cancel'),
     path('<int:pk>/backup-providers/', BackupProvidersView.as_view(), name='backup-providers'),
 
