@@ -23,7 +23,18 @@ export default function FarmerProjectDetail() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [scopeDesc, setScopeDesc] = useState('');
   const [addingService, setAddingService] = useState(false);
+  const [activeTab, setActiveTab] = useState('operations'); // 'operations' | 'services' | 'finance'
   const [error, setError] = useState('');
+
+  const handleCompleteOperation = async (opId) => {
+    try {
+      await api.patch(`/farm-projects/operations/${opId}/`, { status: 'completed' });
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to mark operation completed.');
+    }
+  };
 
   const fetchProjectDetails = async () => {
     setLoading(true);
@@ -340,89 +351,353 @@ export default function FarmerProjectDetail() {
         </div>
       </div>
 
-      {/* Synchronized Services Task List */}
+      {/* 3-Way Project Workspace Tabs: Operations, Services, Financials */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-slate-900">
-            {lang === 'hi' ? 'समन्वित सेवाएं एवं कार्य कार्ड' : 'Synchronized Farm Operations'}
-          </h3>
-          <span className="text-xs text-slate-500 font-medium">
-            {project.project_services?.length || 0} Connected Services
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setActiveTab('operations')}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                activeTab === 'operations'
+                  ? 'bg-[#174D32] text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{lang === 'hi' ? 'फसल कार्य सूची' : 'Crop Operations'}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === 'operations' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {project.project_operations?.length || 0}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                activeTab === 'services'
+                  ? 'bg-[#174D32] text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Tractor className="w-4 h-4" />
+              <span>{lang === 'hi' ? 'समन्वित सेवाएं' : 'Service Bookings'}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === 'services' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {project.project_services?.length || 0}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('finance')}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                activeTab === 'finance'
+                  ? 'bg-[#174D32] text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <IndianRupee className="w-4 h-4" />
+              <span>{lang === 'hi' ? 'फार्म वित्तीय योजना' : 'Financial Planner'}</span>
+              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-black">
+                FIN-01..12
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          {project.project_services?.map((ps, idx) => {
-            const req = ps.service_request_details;
-            const hasBooking = req && req.status === 'booked';
+        {/* TAB 1: Crop Operations Checklist */}
+        {activeTab === 'operations' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
+              <span>{lang === 'hi' ? 'फसल की कालक्रमिक कार्य सूची (क्रमबद्ध निष्पादन)' : 'Sequential Agricultural Task List (Template Workflow)'}</span>
+              <span>{project.project_operations?.filter(o => o.status === 'completed').length || 0} Completed</span>
+            </div>
 
-            return (
-              <div
-                key={ps.id}
-                className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs hover:border-[#84B547] transition flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
-              >
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className="w-6 h-6 rounded-full bg-[#174D32] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                      {idx + 1}
-                    </span>
-                    <span className="font-bold text-base text-slate-900">
-                      {ps.category_details?.name_en} ({lang === 'hi' ? ps.category_details?.name_hi : ''})
-                    </span>
-                    <StatusBadge status={ps.booking_status} />
-                  </div>
+            {project.project_operations && project.project_operations.length > 0 ? (
+              <div className="space-y-3">
+                {project.project_operations.map((op) => {
+                  const isDone = op.status === 'completed';
+                  const isReady = op.status === 'ready' || op.status === 'in_progress';
+                  const isAwaiting = op.status === 'awaiting_prerequisite';
 
-                  <p className="text-xs text-slate-600 font-medium">
-                    {ps.scope_description} • Target Date: <strong className="text-slate-800">{ps.target_date || project.start_date}</strong>
-                  </p>
+                  return (
+                    <div
+                      key={op.id}
+                      className={`bg-white rounded-3xl p-5 border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                        isDone
+                          ? 'border-emerald-200 bg-emerald-50/20'
+                          : isReady
+                          ? 'border-amber-300 shadow-xs'
+                          : 'border-slate-200 opacity-90'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3.5">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
+                          isDone
+                            ? 'bg-emerald-600 text-white'
+                            : isReady
+                            ? 'bg-[#174D32] text-white'
+                            : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {op.sequence_order}
+                        </span>
 
-                  {/* Booking / Quotation summary */}
-                  {req && (
-                    <div className="flex items-center gap-4 text-xs text-slate-500 pt-1 flex-wrap">
-                      <span>Request ID: <strong>REQ-{req.id}</strong></span>
-                      <span>•</span>
-                      <span>Quotes Received: <strong>{req.quotations_count || 0}</strong></span>
-                      {ps.agreed_cost > 0 && (
-                        <>
-                          <span>•</span>
-                          <span className="text-emerald-800 font-black">
-                            Amount: ₹{ps.agreed_cost.toLocaleString()}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-slate-900 text-sm">
+                              {lang === 'hi' && op.operation_name_hi ? op.operation_name_hi : op.operation_name_en}
+                            </h4>
+                            {lang === 'hi' && op.operation_name_en && (
+                              <span className="text-xs text-slate-400">({op.operation_name_en})</span>
+                            )}
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                              {op.stage}
+                            </span>
+                            <StatusBadge status={op.status} />
+                          </div>
+
+                          <p className="text-xs text-slate-500">
+                            Planned: <strong className="text-slate-700">{op.planned_start_date}</strong> to <strong className="text-slate-700">{op.planned_end_date}</strong>
+                            {op.prerequisite_name && isAwaiting && (
+                              <span className="text-amber-700 ml-2 font-medium">
+                                • Awaiting Prerequisite: {op.prerequisite_name}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        {isReady && !isDone && (
+                          <button
+                            onClick={() => handleCompleteOperation(op.id)}
+                            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{lang === 'hi' ? 'पूर्ण मार्क करें' : 'Mark Completed'}</span>
+                          </button>
+                        )}
+                        {isDone && (
+                          <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            {lang === 'hi' ? 'कार्य पूर्ण' : 'Done'}
                           </span>
-                        </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 text-xs text-slate-500">
+                No operations recorded for this project.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: Synchronized Services */}
+        {activeTab === 'services' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
+              <span>{lang === 'hi' ? 'बाज़ार से जुड़ी सेवाएं एवं बुकिंग्स' : 'Marketplace Service Requests & Assigned Bookings'}</span>
+              <span>{project.project_services?.length || 0} Connected Services</span>
+            </div>
+
+            <div className="space-y-4">
+              {project.project_services?.map((ps, idx) => {
+                const req = ps.service_request_details;
+                const hasBooking = req && req.status === 'booked';
+
+                return (
+                  <div
+                    key={ps.id}
+                    className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs hover:border-[#84B547] transition flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+                  >
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="w-6 h-6 rounded-full bg-[#174D32] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-bold text-base text-slate-900">
+                          {ps.category_details?.name_en} ({lang === 'hi' ? ps.category_details?.name_hi : ''})
+                        </span>
+                        <StatusBadge status={ps.booking_status} />
+                      </div>
+
+                      <p className="text-xs text-slate-600 font-medium">
+                        {ps.scope_description} • Target Date: <strong className="text-slate-800">{ps.target_date || project.start_date}</strong>
+                      </p>
+
+                      {req && (
+                        <div className="flex items-center gap-4 text-xs text-slate-500 pt-1 flex-wrap">
+                          <span>Request ID: <strong>REQ-{req.id}</strong></span>
+                          <span>•</span>
+                          <span>Quotes Received: <strong>{req.quotations_count || 0}</strong></span>
+                          {ps.agreed_cost > 0 && (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-800 font-black">
+                                Amount: ₹{ps.agreed_cost.toLocaleString()}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       )}
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-3 w-full md:w-auto justify-end">
+                      {req ? (
+                        <Link
+                          to={`/farmer/requests/${req.id}`}
+                          className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <span>
+                            {hasBooking
+                              ? (lang === 'hi' ? 'बुकिंग विवरण देखें' : 'View Booking')
+                              : (lang === 'hi' ? 'कोटेशन देखें' : 'Review Quotes')}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSelectedCategory(ps.category);
+                            setShowAddServiceModal(true);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-[#84B547] text-white text-xs font-bold"
+                        >
+                          Create Request
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Farm Financial Planner (FIN-01 to FIN-12) */}
+        {activeTab === 'finance' && project.financial_summary && (
+          <div className="space-y-6">
+            {/* Core 4-KPI Row strictly separating estimates, commitments, incurred, balance */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                  {lang === 'hi' ? '१. अनुमानित बजट' : '1. Planned Estimates'}
+                </span>
+                <span className="text-xl font-black text-slate-800 block">
+                  ₹{Number(project.financial_summary.planned_estimates).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-slate-400">FIN-01 • Pre-contracting budget</span>
+              </div>
+
+              <div className="bg-amber-50/50 rounded-3xl p-5 border border-amber-200 shadow-xs space-y-1">
+                <span className="text-[10px] font-black uppercase text-amber-900 tracking-wider block">
+                  {lang === 'hi' ? '२. पक्की प्रतिबद्धताएं' : '2. Confirmed Commitments'}
+                </span>
+                <span className="text-xl font-black text-amber-900 block">
+                  ₹{Number(project.financial_summary.confirmed_commitments).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-amber-700">FIN-02 • Accepted Quotations</span>
+              </div>
+
+              <div className="bg-indigo-50/50 rounded-3xl p-5 border border-indigo-200 shadow-xs space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider block">
+                  {lang === 'hi' ? '३. वास्तविक देय खर्च' : '3. Incurred Liabilities'}
+                </span>
+                <span className="text-xl font-black text-indigo-900 block">
+                  ₹{Number(project.financial_summary.incurred_expenditure).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-indigo-700">FIN-03 • Approved Completed Work</span>
+              </div>
+
+              <div className="bg-emerald-50 rounded-3xl p-5 border border-emerald-300 shadow-xs space-y-1">
+                <span className="text-[10px] font-black uppercase text-emerald-900 tracking-wider block">
+                  {lang === 'hi' ? '४. देय बकाया राशि' : '4. Outstanding Balance'}
+                </span>
+                <span className="text-xl font-black text-emerald-900 block">
+                  ₹{Number(project.financial_summary.outstanding_balance).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-emerald-700 font-semibold">FIN-06 • Incurred less Payments</span>
+              </div>
+            </div>
+
+            {/* Detailed Ledger & Breakdown Card */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-5">
+              <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
+                <IndianRupee className="w-4 h-4 text-[#174D32]" />
+                <span>{lang === 'hi' ? 'भुगतान एवं परिचालन विवरण (लेखा)' : 'Operational Payment Ledger & Surplus Breakdown'}</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                {/* Left: Payment tracking */}
+                <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="font-bold text-slate-800 block text-xs border-b border-slate-200 pb-2">
+                    Payment Ledger Tracking
+                  </span>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Advance Payments (FIN-04):</span>
+                    <strong className="text-slate-900">₹{Number(project.financial_summary.recorded_advance_payments).toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Partial Payments (FIN-05):</span>
+                    <strong className="text-slate-900">₹{Number(project.financial_summary.recorded_partial_payments).toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Total Payments Recorded:</span>
+                    <strong className="text-slate-900">₹{Number(project.financial_summary.total_recorded_payments).toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-rose-600">Refunds Recorded (FIN-11):</span>
+                    <strong className="text-rose-700">- ₹{Number(project.financial_summary.refunds).toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between py-1.5 font-bold text-slate-900">
+                    <span>Net Recorded Payments:</span>
+                    <span className="text-emerald-700">₹{Number(project.financial_summary.net_recorded_payments).toLocaleString()}</span>
+                  </div>
+                  {Number(project.financial_summary.overpayment_balance) > 0 && (
+                    <div className="flex justify-between py-1 text-amber-800 font-bold bg-amber-50 px-2 rounded-lg">
+                      <span>Overpayment Balance (FIN-07):</span>
+                      <span>₹{Number(project.financial_summary.overpayment_balance).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="shrink-0 flex items-center gap-3 w-full md:w-auto justify-end">
-                  {req ? (
-                    <Link
-                      to={`/farmer/requests/${req.id}`}
-                      className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5"
-                    >
-                      <span>
-                        {hasBooking
-                          ? (lang === 'hi' ? 'बुकिंग विवरण देखें' : 'View Booking')
-                          : (lang === 'hi' ? 'कोटेशन देखें' : 'Review Quotes')}
-                      </span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedCategory(ps.category);
-                        setShowAddServiceModal(true);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-[#84B547] text-white text-xs font-bold"
-                    >
-                      Create Request
-                    </button>
-                  )}
+                {/* Right: Revenue & Surplus */}
+                <div className="space-y-3 p-4 rounded-2xl bg-[#FAF8F2] border border-amber-200">
+                  <span className="font-bold text-slate-800 block text-xs border-b border-amber-200 pb-2">
+                    Harvest Revenue & Operational Margin (FIN-12)
+                  </span>
+                  <div className="flex justify-between py-1 border-b border-amber-100">
+                    <span className="text-slate-600">Cultivated Area:</span>
+                    <strong className="text-slate-900">{project.financial_summary.cultivated_area_acres} Acres</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-amber-100">
+                    <span className="text-slate-600">Cost Per Acre:</span>
+                    <strong className="text-slate-900">₹{Number(project.financial_summary.cost_per_acre).toLocaleString()} / Acre</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-amber-100">
+                    <span className="text-slate-600">Realized Harvest Revenue:</span>
+                    <strong className="text-emerald-800 font-black">₹{Number(project.financial_summary.realized_revenue).toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-amber-100">
+                    <span className="text-slate-600">Incurred Cost Deductions:</span>
+                    <strong className="text-rose-700">- ₹{Number(project.financial_summary.incurred_expenditure).toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between py-2 font-black text-sm bg-emerald-100/70 text-emerald-950 px-3 rounded-xl mt-2">
+                    <span>Recorded Net Surplus:</span>
+                    <span>₹{Number(project.financial_summary.recorded_surplus).toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Statutory Economic Disclaimer */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 text-[11px] leading-relaxed">
+                <strong className="text-slate-700 font-bold block mb-0.5">⚠️ Platform Economic Notice:</strong>
+                {project.financial_summary.economic_disclaimer} Live payment collection is disabled in this MVP; entries record direct provider settlements on the platform ledger.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Service Modal */}

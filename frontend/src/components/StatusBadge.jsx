@@ -42,6 +42,36 @@ export default function StatusBadge({ status }) {
       label_en: 'In Progress',
       label_hi: 'कार्य जारी है'
     },
+    completion_pending: {
+      bg: 'bg-yellow-50 text-yellow-800 border-yellow-200',
+      icon: Clock,
+      label_en: 'Review Pending',
+      label_hi: 'निरीक्षण प्रतीक्षारत'
+    },
+    partially_completed: {
+      bg: 'bg-orange-50 text-orange-800 border-orange-200',
+      icon: AlertTriangle,
+      label_en: 'Partially Completed',
+      label_hi: 'आंशिक रूप से पूर्ण'
+    },
+    under_administrative_review: {
+      bg: 'bg-purple-50 text-purple-800 border-purple-200',
+      icon: AlertTriangle,
+      label_en: 'Under Admin Review',
+      label_hi: 'प्रशासनिक समीक्षाधीन'
+    },
+    disputed: {
+      bg: 'bg-rose-50 text-rose-800 border-rose-200',
+      icon: AlertTriangle,
+      label_en: 'Disputed',
+      label_hi: 'विवादित'
+    },
+    awaiting_prerequisite: {
+      bg: 'bg-slate-100 text-slate-700 border-slate-200',
+      icon: Clock,
+      label_en: 'Awaiting Prerequisite',
+      label_hi: 'पूर्व कार्य प्रतीक्षारत'
+    },
     completed: {
       bg: 'bg-teal-50 text-teal-800 border-teal-200',
       icon: CheckCircle2,

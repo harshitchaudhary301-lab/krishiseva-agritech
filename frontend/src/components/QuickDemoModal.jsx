@@ -28,8 +28,7 @@ export default function QuickDemoModal({ isOpen, onClose }) {
       } else if (user.role === 'provider') {
         navigate('/provider/dashboard');
       } else if (user.role === 'admin' || user.is_superuser) {
-        window.open(getAdminUrl(), '_blank');
-        navigate('/farmer/overview');
+        navigate('/admin');
       }
     } catch (err) {
       console.error(err);
@@ -99,6 +98,18 @@ export default function QuickDemoModal({ isOpen, onClose }) {
       desc: lang === 'hi'
         ? 'सबमर्सिबल मोटर, वाइंडिंग और स्टार्टर मरम्मत विशेषज्ञ (4.8★)।'
         : 'Borewell pump rewinding & electrical starter repair.'
+    },
+    {
+      key: 'admin',
+      name: 'System Administrator',
+      roleText: lang === 'hi' ? 'प्रशासन एवं अनुपालन डेस्क' : 'Governance & Verification Admin',
+      village: 'Regional HQ',
+      badge: lang === 'hi' ? 'एडमिन डेस्क' : 'Admin Governance',
+      icon: ShieldCheck,
+      color: 'bg-purple-50 text-purple-800 border-purple-200 hover:border-purple-500',
+      desc: lang === 'hi'
+        ? 'प्रदाता सत्यापन, निलंबन, शिकायत समाधान और अपरिवर्तनीय ऑडिट ट्रेल प्रबंधन।'
+        : 'Provider vetting, credentials inspection, suspensions, and immutable audit logs.'
     }
   ];
 

@@ -42,6 +42,9 @@ import ProviderBookings from './pages/provider/ProviderBookings';
 import ProviderEarnings from './pages/provider/ProviderEarnings';
 import ProviderProfileView from './pages/provider/ProviderProfileView';
 
+// Admin Page
+import AdminDashboard from './pages/admin/AdminDashboard';
+
 // Layout for Public Site
 function PublicLayout({ children }) {
   return (
@@ -126,6 +129,24 @@ export default function App() {
               <Route path="earnings" element={<ProviderEarnings />} />
               <Route path="profile" element={<ProviderProfileView />} />
             </Route>
+
+            {/* Admin Protected Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

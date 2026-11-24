@@ -72,13 +72,34 @@ export const translations = {
     status: {
       open: "Open for Quotes",
       quote_accepted: "Quote Accepted (Awaiting Confirmation)",
+      pending_confirmation: "Pending Provider Confirmation",
       confirmed: "Confirmed",
       scheduled: "Scheduled",
       in_progress: "In Progress",
+      completion_pending: "Completion Pending (Farmer Review)",
       completed: "Completed",
+      partially_completed: "Partially Completed",
       cancelled: "Cancelled",
       cancelled_by_farmer: "Cancelled by Farmer",
-      cancelled_by_provider: "Cancelled by Provider"
+      cancelled_by_provider: "Cancelled by Provider",
+      under_administrative_review: "Under Administrative Review",
+      disputed: "Disputed"
+    },
+    finance: {
+      plannedEstimates: "Planned Estimates",
+      confirmedCommitments: "Confirmed Commitments",
+      incurredExpenditure: "Incurred Expenditure",
+      advancePayments: "Advance Payments",
+      partialPayments: "Partial Payments",
+      totalPayments: "Total Payments Made",
+      refunds: "Refunds",
+      netPayments: "Net Payments",
+      outstandingBalance: "Outstanding Balance",
+      overpaymentBalance: "Overpayment Balance",
+      realizedRevenue: "Realized Revenue",
+      recordedSurplus: "Recorded Surplus / Net Margin",
+      costPerAcre: "Cost Per Acre",
+      disclaimer: "Recorded surplus reflects platform operational records; not a certified comprehensive economic audit."
     }
   },
   hi: {
@@ -150,13 +171,34 @@ export const translations = {
     status: {
       open: "कोटेशन के लिए खुला",
       quote_accepted: "कोटेशन स्वीकृत (सहमति प्रतीक्षारत)",
+      pending_confirmation: "प्रदाता पुष्टि प्रतीक्षारत",
       confirmed: "बुकिंग पक्की",
       scheduled: "शेड्यूल किया गया",
       in_progress: "कार्य प्रगति पर",
+      completion_pending: "कार्य पूर्णता निरीक्षण प्रतीक्षारत",
       completed: "पूर्ण हुआ",
+      partially_completed: "आंशिक रूप से पूर्ण",
       cancelled: "रद्द किया गया",
       cancelled_by_farmer: "किसान द्वारा रद्द",
-      cancelled_by_provider: "प्रदाता द्वारा रद्द"
+      cancelled_by_provider: "प्रदाता द्वारा रद्द",
+      under_administrative_review: "प्रशासनिक समीक्षाधीन",
+      disputed: "विवादित"
+    },
+    finance: {
+      plannedEstimates: "नियोजित अनुमानित बजट",
+      confirmedCommitments: "स्वीकृत प्रतिबद्धताएं",
+      incurredExpenditure: "वास्तविक खर्च (देय दायित्व)",
+      advancePayments: "अग्रिम भुगतान",
+      partialPayments: "आंशिक भुगतान",
+      totalPayments: "कुल दर्ज भुगतान",
+      refunds: "वापसी (रिफंड)",
+      netPayments: "शुद्ध भुगतान",
+      outstandingBalance: "बकाया भुगतान",
+      overpaymentBalance: "अतिरिक्त भुगतान शेष",
+      realizedRevenue: "फसल बिक्री से आय",
+      recordedSurplus: "दर्ज शुद्ध मुनाफा / मार्जिन",
+      costPerAcre: "प्रति एकड़ लागत",
+      disclaimer: "दर्ज अधिशेष मंच परिचालन रिकॉर्ड दर्शाता है; यह औपचारिक लेखा परीक्षा नहीं है।"
     }
   }
 };
