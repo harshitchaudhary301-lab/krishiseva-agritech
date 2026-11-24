@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, User, ArrowRight, Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { useAuth, DEMO_USERS } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { DEMO_USERS } from '../constants/demoUsers';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function LoginPage() {

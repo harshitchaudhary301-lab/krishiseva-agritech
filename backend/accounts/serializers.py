@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, FarmerProfile, WorkerProfile, ProviderProfile
+from .models import User, FarmerProfile, WorkerProfile, ProviderProfile, UserConsent, VerificationAuditLog
 
 class FarmerProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,13 +10,22 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
 class WorkerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerProfile
-        fields = ['skills', 'daily_wage_rate', 'experience_years', 'is_available', 'verification_status', 'rating', 'completed_jobs_count', 'bio']
+        fields = [
+            'skills', 'daily_wage_rate', 'experience_years', 'is_available',
+            'verification_status', 'verified_at', 'rating', 'completed_jobs_count', 'bio'
+        ]
+        read_only_fields = ['verification_status', 'verified_at', 'rating', 'completed_jobs_count']
 
 
 class ProviderProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProviderProfile
-        fields = ['business_name', 'service_categories', 'service_radius_km', 'service_villages', 'is_available', 'qualifications', 'machinery_details', 'verification_status', 'rating', 'completed_bookings_count', 'bio']
+        fields = [
+            'business_name', 'service_categories', 'service_radius_km', 'service_villages',
+            'is_available', 'qualifications', 'machinery_details',
+            'verification_status', 'verified_at', 'rating', 'completed_bookings_count', 'bio'
+        ]
+        read_only_fields = ['verification_status', 'verified_at', 'rating', 'completed_bookings_count']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -32,12 +41,18 @@ class UserSerializer(serializers.ModelSerializer):
             'profile_complete', 'date_joined',
             'farmer_profile', 'worker_profile', 'provider_profile'
         ]
+        read_only_fields = ['id', 'role', 'date_joined']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
+    # Consent fields
+    consent_terms = serializers.BooleanField(write_only=True, required=False, default=True)
+    consent_privacy = serializers.BooleanField(write_only=True, required=False, default=True)
+    terms_version = serializers.CharField(write_only=True, required=False, default='v1.0')
+
     # Specific profile fields
     land_acres = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0.0)
     primary_crops = serializers.CharField(required=False, allow_blank=True)
@@ -54,15 +69,26 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'name', 'role',
             'phone', 'state', 'district', 'village',
+            'consent_terms', 'consent_privacy', 'terms_version',
             'land_acres', 'primary_crops', 'skills', 'daily_wage_rate',
             'business_name', 'service_categories', 'service_villages',
             'qualifications', 'machinery_details'
         ]
 
+    def validate_role(self, value):
+        if value not in ['farmer', 'worker', 'provider']:
+            raise serializers.ValidationError("Invalid registration role. Public registration for administrative roles is prohibited.")
+        return value
+
     def create(self, validated_data):
         name = validated_data.pop('name', '')
         password = validated_data.pop('password')
         role = validated_data.get('role', 'farmer')
+
+        # Pop consent fields
+        consent_terms = validated_data.pop('consent_terms', True)
+        consent_privacy = validated_data.pop('consent_privacy', True)
+        terms_version = validated_data.pop('terms_version', 'v1.0')
 
         # Extract profile fields
         land_acres = validated_data.pop('land_acres', 0.0)
@@ -95,7 +121,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
 
-        # Create corresponding role profile
+        # Create consent record
+        UserConsent.objects.create(
+            user=user,
+            terms_accepted=consent_terms,
+            privacy_accepted=consent_privacy,
+            terms_version=terms_version
+        )
+
+        # Create corresponding role profile: WORKERS & PROVIDERS MUST DEFAULT TO PENDING
         if role == 'farmer':
             FarmerProfile.objects.create(
                 user=user,
@@ -107,7 +141,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 user=user,
                 skills=skills,
                 daily_wage_rate=daily_wage_rate,
-                verification_status='verified'
+                verification_status='pending'  # Never auto-verify newly registered workers
             )
         elif role == 'provider':
             ProviderProfile.objects.create(
@@ -117,7 +151,26 @@ class RegisterSerializer(serializers.ModelSerializer):
                 service_villages=service_villages or user.village,
                 qualifications=qualifications,
                 machinery_details=machinery_details,
-                verification_status='verified'
+                verification_status='pending'  # Never auto-verify newly registered providers
             )
 
         return user
+
+
+class AdminVerificationActionSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(required=True)
+    action = serializers.ChoiceField(choices=['verify', 'reject', 'suspend', 'reinstate'])
+    reason = serializers.CharField(required=True, min_length=5, allow_blank=False)
+
+
+class VerificationAuditLogSerializer(serializers.ModelSerializer):
+    actor_name = serializers.ReadOnlyField(source='actor.get_full_name')
+    target_username = serializers.ReadOnlyField(source='target_user.username')
+
+    class Meta:
+        model = VerificationAuditLog
+        fields = [
+            'id', 'target_user', 'target_username', 'actor', 'actor_name',
+            'action', 'previous_status', 'new_status', 'reason', 'timestamp'
+        ]
+

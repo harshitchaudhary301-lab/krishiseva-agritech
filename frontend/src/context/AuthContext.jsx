@@ -1,40 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/client';
+import { DEMO_USERS } from '../constants/demoUsers';
 
 const AuthContext = createContext();
-
-export const DEMO_USERS = {
-  farmer: {
-    username: 'ramesh_farmer',
-    password: 'farmer123',
-    label: 'Ramesh Patel (Farmer — 20 Acres, Daurala)',
-    role: 'farmer'
-  },
-  worker: {
-    username: 'suresh_worker',
-    password: 'worker123',
-    label: 'Suresh Kumar (Worker Lead — Harvesting, Daurala)',
-    role: 'worker'
-  },
-  mechanic: {
-    username: 'vikram_mechanic',
-    password: 'provider123',
-    label: 'Vikram Singh (Tractor Mechanic, Daurala)',
-    role: 'provider'
-  },
-  machinery: {
-    username: 'baldev_machinery',
-    password: 'provider123',
-    label: 'Baldev Singh (Machinery Rental — Harvesters, Mawana)',
-    role: 'provider'
-  },
-  tubewell: {
-    username: 'amit_tubewell',
-    password: 'provider123',
-    label: 'Amit Verma (Tubewell & Motor Technician, Daurala)',
-    role: 'provider'
-  }
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {

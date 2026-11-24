@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Sparkles, User, Wrench, Tractor, Users, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
-import { useAuth, DEMO_USERS } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { DEMO_USERS } from '../constants/demoUsers';
 import { useLanguage } from '../context/LanguageContext';
 import { getAdminUrl } from '../api/client';
 

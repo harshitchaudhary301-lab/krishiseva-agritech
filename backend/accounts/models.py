@@ -49,6 +49,7 @@ class WorkerProfile(models.Model):
         ('pending', 'Pending Verification'),
         ('verified', 'Verified'),
         ('rejected', 'Rejected'),
+        ('suspended', 'Suspended'),
     ]
     
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='worker_profile')
@@ -56,13 +57,24 @@ class WorkerProfile(models.Model):
     daily_wage_rate = models.DecimalField(max_digits=8, decimal_places=2, default=500.0)
     experience_years = models.IntegerField(default=3)
     is_available = models.BooleanField(default=True)
-    verification_status = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='verified')
+    verification_status = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='pending')
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_workers')
+    verification_notes = models.TextField(blank=True)
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspension_reason = models.TextField(blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=4.8)
     completed_jobs_count = models.IntegerField(default=0)
     bio = models.TextField(blank=True)
 
+    def is_verified(self):
+        return self.verification_status == 'verified'
+
+    def is_suspended(self):
+        return self.verification_status == 'suspended'
+
     def __str__(self):
-        return f"Worker Profile: {self.user.username}"
+        return f"Worker Profile: {self.user.username} ({self.verification_status})"
 
 
 class ProviderProfile(models.Model):
@@ -70,6 +82,7 @@ class ProviderProfile(models.Model):
         ('pending', 'Pending Verification'),
         ('verified', 'Verified'),
         ('rejected', 'Rejected'),
+        ('suspended', 'Suspended'),
     ]
     
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='provider_profile')
@@ -80,10 +93,60 @@ class ProviderProfile(models.Model):
     is_available = models.BooleanField(default=True)
     qualifications = models.TextField(blank=True, help_text="Certifications, ITI diploma, machinery licenses")
     machinery_details = models.TextField(blank=True, help_text="Tractors, Harvesters, Roto-seeders available")
-    verification_status = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='verified')
+    verification_status = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='pending')
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_providers')
+    verification_notes = models.TextField(blank=True)
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspension_reason = models.TextField(blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=4.9)
     completed_bookings_count = models.IntegerField(default=0)
     bio = models.TextField(blank=True)
 
+    def is_verified(self):
+        return self.verification_status == 'verified'
+
+    def is_suspended(self):
+        return self.verification_status == 'suspended'
+
     def __str__(self):
-        return f"Provider Profile: {self.business_name or self.user.username}"
+        return f"Provider Profile: {self.business_name or self.user.username} ({self.verification_status})"
+
+
+class UserConsent(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consents')
+    terms_accepted = models.BooleanField(default=True)
+    privacy_accepted = models.BooleanField(default=True)
+    terms_version = models.CharField(max_length=20, default='v1.0')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"Consent by {self.user.username} ({self.terms_version}) on {self.timestamp}"
+
+
+class VerificationAuditLog(models.Model):
+    ACTION_CHOICES = [
+        ('verify', 'Verified'),
+        ('reject', 'Rejected'),
+        ('suspend', 'Suspended'),
+        ('reinstate', 'Reinstated'),
+    ]
+
+    target_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_logs')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verification_actions_performed')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    previous_status = models.CharField(max_length=20)
+    new_status = models.CharField(max_length=20)
+    reason = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.target_user.username}: {self.action} by {self.actor.username if self.actor else 'system'}"
