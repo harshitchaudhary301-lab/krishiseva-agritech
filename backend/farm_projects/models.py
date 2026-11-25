@@ -18,38 +18,38 @@ class Farm(models.Model):
     district = models.CharField(max_length=100, default='Meerut')
     state = models.CharField(max_length=100, default='Uttar Pradesh')
     lgd_code = models.CharField(max_length=50, blank=True, default='', help_text="Local Government Directory administrative code")
-    land_tenure = models.CharField(max_length=50, choices=TENURE_CHOICES, default='owned')
-    size_acres = models.DecimalField(max_digits=6, decimal_places=2, default=10.0, help_text="Standardized area in acres")
+    land_tenure = models.CharField(max_length=50, choices=TENURE_CHOICES, blank=True, default='')
+    size_acres = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Standardized area in acres")
     original_area_unit = models.CharField(max_length=50, default='acre', help_text="Original measurement unit (Acre, Bigha, Hectare)")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Consented farm center coordinate")
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Consented farm center coordinate")
-    current_crops = models.CharField(max_length=255, default='Wheat')
-    soil_type = models.CharField(max_length=100, blank=True, default='Alluvial Loam')
-    irrigation_source = models.CharField(max_length=100, blank=True, default='Tubewell + Canal')
+    current_crops = models.CharField(max_length=255, blank=True, default='')
+    soil_type = models.CharField(max_length=100, blank=True, default='')
+    irrigation_source = models.CharField(max_length=100, blank=True, default='')
     history_notes = models.TextField(blank=True, default='', help_text="Historical cropping and soil management notes")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.name} ({self.size_acres} Acres) - {self.farmer.username}"
+        return f"{self.name} ({self.size_acres or '?'} Acres) - {self.farmer.username}"
 
 
 class Field(models.Model):
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name='fields')
     name = models.CharField(max_length=150, help_text="e.g. North Plot, Tubewell Khet, Khasra 402")
     khasra_number = models.CharField(max_length=100, blank=True, default='', help_text="Official parcel identifier / survey number")
-    area_acres = models.DecimalField(max_digits=6, decimal_places=2, default=5.0)
+    area_acres = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     original_area_value = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Original area value as entered by farmer")
     original_area_unit = models.CharField(max_length=50, default='acre', help_text="Original measurement unit (Acre, Bigha, Hectare)")
-    land_tenure = models.CharField(max_length=50, choices=Farm.TENURE_CHOICES, blank=True, default='owned')
-    soil_type = models.CharField(max_length=100, blank=True, default='Alluvial Loam')
-    irrigation_status = models.CharField(max_length=100, blank=True, default='Tubewell Irrigated')
+    land_tenure = models.CharField(max_length=50, choices=Farm.TENURE_CHOICES, blank=True, default='')
+    soil_type = models.CharField(max_length=100, blank=True, default='')
+    irrigation_status = models.CharField(max_length=100, blank=True, default='')
     history_notes = models.TextField(blank=True, default='', help_text="Historical parcel notes")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.name} ({self.area_acres} Acres) - {self.farm.name}"
+        return f"{self.name} ({self.area_acres or '?'} Acres) - {self.farm.name}"
 
 
 class CropTemplate(models.Model):

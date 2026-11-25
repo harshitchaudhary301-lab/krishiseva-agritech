@@ -1,17 +1,25 @@
 @import "tailwindcss";
 
 @theme {
+  /* KS-FDC-04 Approved Design System */
+  --color-obsidian: #101510;
   --color-forest: #174D32;
   --color-forest-dark: #0e3321;
   --color-forest-light: #236544;
+  --color-harvest: #FCE052;
+  --color-harvest-dark: #E8B44C;
+  --color-harvest-light: #FFF3B0;
   --color-fresh: #84B547;
   --color-fresh-light: #a2d264;
-  --color-cream: #F5F1E6;
+  --color-cream: #F4F4EE;
   --color-cream-light: #FAF8F2;
   --color-softbg: #F7F9F5;
   --color-gold: #E8B44C;
   --color-gold-dark: #c9932d;
   --color-gold-light: #f7d488;
+  --color-primary-text: #172D20;
+  --color-secondary-text: #64748B;
+  --color-border: #E2E8DF;
   --font-sans: 'Manrope', 'Inter', system-ui, sans-serif;
   --font-hindi: 'Noto Sans Devanagari', system-ui, sans-serif;
 }

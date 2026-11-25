@@ -63,14 +63,10 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Public Routes */}
+            {/* Public Routes — Landing has its own nav/footer */}
             <Route
               path="/"
-              element={
-                <PublicLayout>
-                  <LandingPage />
-                </PublicLayout>
-              }
+              element={<LandingPage />}
             />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
