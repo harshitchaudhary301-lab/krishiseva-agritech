@@ -24,6 +24,7 @@ import FarmerBookings from './pages/farmer/FarmerBookings';
 import FarmerProjects from './pages/farmer/FarmerProjects';
 import FarmerProjectDetail from './pages/farmer/FarmerProjectDetail';
 import FarmerCalendar from './pages/farmer/FarmerCalendar';
+import FarmerAnalytics from './pages/farmer/FarmerAnalytics';
 import FarmerHelp from './pages/farmer/FarmerHelp';
 import FarmerSettings from './pages/farmer/FarmerSettings';
 
@@ -93,6 +94,7 @@ export default function App() {
               <Route path="projects" element={<FarmerProjects />} />
               <Route path="projects/:id" element={<FarmerProjectDetail />} />
               <Route path="calendar" element={<FarmerCalendar />} />
+              <Route path="analytics" element={<FarmerAnalytics />} />
               <Route path="help" element={<FarmerHelp />} />
               <Route path="settings" element={<FarmerSettings />} />
             </Route>

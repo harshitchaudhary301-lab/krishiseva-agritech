@@ -7,7 +7,13 @@ from .views import (
     ProjectAddServiceView,
     ProjectFinancialSummaryView, ExpenseRecordListCreateView,
     PaymentRecordListCreateView, RevenueRecordListCreateView,
-    FinancialAdjustmentCreateView
+    FinancialAdjustmentCreateView,
+    SoilReportListCreateView, SoilReportDetailView,
+    SeedProcurementRecordListCreateView,
+    CropObservationListCreateView,
+    PostHarvestRecordListCreateView,
+    ProjectOperationManualCompleteView,
+    FarmAnalyticsView
 )
 
 urlpatterns = [
@@ -25,5 +31,12 @@ urlpatterns = [
     path('expenses/<int:expense_pk>/adjustments/', FinancialAdjustmentCreateView.as_view(), name='expense-adjustments'),
     path('projects/<int:project_pk>/operations/', ProjectOperationListCreateView.as_view(), name='project-operations-list-create'),
     path('operations/<int:pk>/', ProjectOperationDetailView.as_view(), name='project-operation-detail'),
+    path('operations/<int:pk>/mark-completed/', ProjectOperationManualCompleteView.as_view(), name='project-operation-mark-completed'),
     path('projects/<int:pk>/add-service/', ProjectAddServiceView.as_view(), name='project-add-service'),
+    path('projects/<int:project_pk>/seeds/', SeedProcurementRecordListCreateView.as_view(), name='project-seeds'),
+    path('projects/<int:project_pk>/observations/', CropObservationListCreateView.as_view(), name='project-observations'),
+    path('projects/<int:project_pk>/post-harvest/', PostHarvestRecordListCreateView.as_view(), name='project-post-harvest'),
+    path('soil-reports/', SoilReportListCreateView.as_view(), name='soil-reports-list-create'),
+    path('soil-reports/<int:pk>/', SoilReportDetailView.as_view(), name='soil-report-detail'),
+    path('analytics/', FarmAnalyticsView.as_view(), name='farm-analytics'),
 ]

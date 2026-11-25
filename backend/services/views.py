@@ -4,12 +4,15 @@ from rest_framework.views import APIView
 from django.db.models import Q, Avg
 from .models import (
     ServiceCategory, Village, ProviderService, Review,
-    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage
+    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage,
+    InstitutionalResource
 )
 from .serializers import (
     ServiceCategorySerializer, VillageSerializer, ProviderServiceSerializer, ReviewSerializer,
-    AgriculturalReferenceRecordSerializer, HistoricalMachineryRateSerializer, HistoricalAgriculturalWageSerializer
+    AgriculturalReferenceRecordSerializer, HistoricalMachineryRateSerializer, HistoricalAgriculturalWageSerializer,
+    InstitutionalResourceSerializer
 )
+from .weather import get_weather_forecast
 from accounts.models import User
 from accounts.serializers import UserSerializer
 
@@ -190,3 +193,41 @@ class AgriculturalReferenceRecordListView(generics.ListAPIView):
         if crop:
             qs = qs.filter(crop__icontains=crop)
         return qs
+
+
+class InstitutionalResourceListView(generics.ListAPIView):
+    """
+    Module 12: Government & Institutional Connect
+    Read-only public directory of official government schemes, KVKs, ICAR research centers, and portals.
+    """
+    permission_classes = [permissions.AllowAny]
+    serializer_class = InstitutionalResourceSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = InstitutionalResource.objects.filter(is_verified=True)
+        category = self.request.query_params.get('category')
+        search = self.request.query_params.get('search')
+        if category:
+            qs = qs.filter(category=category)
+        if search:
+            qs = qs.filter(Q(name_en__icontains=search) | Q(name_hi__icontains=search) | Q(description_en__icontains=search))
+        return qs
+
+
+class WeatherForecastView(APIView):
+    """
+    Module 05: Weather Intelligence
+    Returns live weather conditions, 3-day forecast, and agro-advisories for a given latitude/longitude or district.
+    Cached for 1 hour with robust offline fallback.
+    STRICT RULE: Weather advisories do not automatically cancel confirmed bookings.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        lat = request.query_params.get('lat') or request.query_params.get('latitude')
+        lon = request.query_params.get('lon') or request.query_params.get('longitude')
+        district = request.query_params.get('district', 'Meerut')
+        weather_data = get_weather_forecast(latitude=lat, longitude=lon, district=district)
+        return Response(weather_data)
+

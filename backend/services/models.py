@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 class Village(models.Model):
     name = models.CharField(max_length=100)
@@ -150,3 +151,40 @@ class HistoricalAgriculturalWage(models.Model):
 
     def __str__(self):
         return f"{self.state} - {self.operation} ({self.reference_year}): ₹{self.daily_wage_rate}/day"
+
+
+class InstitutionalResource(models.Model):
+    """
+    Module 12: Government & Institutional Connect
+    Maintains verified directories of central and state agricultural schemes,
+    ICAR research institutes, Krishi Vigyan Kendras (KVKs), and registered FPOs.
+    """
+    CATEGORY_CHOICES = [
+        ('central_scheme', 'Central Government Scheme (केन्द्रीय योजना)'),
+        ('state_scheme', 'State Government Scheme (राज्य योजना)'),
+        ('icar_institute', 'ICAR Research Institute (अनुसंधान संस्थान)'),
+        ('kvk', 'Krishi Vigyan Kendra (कृषि विज्ञान केंद्र)'),
+        ('fpo', 'Farmer Producer Organization (एफपीओ)'),
+        ('portal', 'Official Information Portal (आधिकारिक पोर्टल)'),
+    ]
+
+    name_en = models.CharField(max_length=200)
+    name_hi = models.CharField(max_length=200)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='central_scheme')
+    description_en = models.TextField(blank=True)
+    description_hi = models.TextField(blank=True)
+    official_url = models.URLField(max_length=300)
+    geographic_coverage = models.CharField(max_length=150, default='All India / Pan-India')
+    implementing_agency = models.CharField(max_length=200, blank=True)
+    contact_info = models.CharField(max_length=200, blank=True)
+    is_verified = models.BooleanField(default=True)
+    last_reviewed_date = models.DateField(default=timezone.localdate)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['display_order', 'category', 'name_en']
+
+    def __str__(self):
+        return f"{self.name_en} ({self.get_category_display()})"
+

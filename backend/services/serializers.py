@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     ServiceCategory, Village, ProviderService, Review,
-    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage
+    AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage,
+    InstitutionalResource
 )
 from accounts.serializers import UserSerializer
 
@@ -64,3 +65,17 @@ class HistoricalAgriculturalWageSerializer(serializers.ModelSerializer):
     class Meta:
         model = HistoricalAgriculturalWage
         fields = '__all__'
+
+
+class InstitutionalResourceSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = InstitutionalResource
+        fields = [
+            'id', 'name_en', 'name_hi', 'category', 'category_display',
+            'description_en', 'description_hi', 'official_url',
+            'geographic_coverage', 'implementing_agency', 'contact_info',
+            'is_verified', 'last_reviewed_date', 'display_order', 'created_at'
+        ]
+

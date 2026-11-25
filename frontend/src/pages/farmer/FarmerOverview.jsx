@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Tractor, Users, Wrench, Droplet, Plus, ArrowRight,
   FolderKanban, Calendar, Clock, CheckCircle2, AlertTriangle,
-  MapPin, Loader2, IndianRupee
+  MapPin, Loader2, IndianRupee, CloudSun, Droplets, Wind, BarChart3
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -21,22 +21,25 @@ export default function FarmerOverview() {
   const [bookings, setBookings] = useState([]);
   const [projects, setProjects] = useState([]);
   const [farms, setFarms] = useState([]);
+  const [weather, setWeather] = useState(null);
   const [createReqOpen, setCreateReqOpen] = useState(false);
   const [preselectedSlug, setPreselectedSlug] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [reqRes, bookRes, projRes, farmRes] = await Promise.all([
+      const [reqRes, bookRes, projRes, farmRes, weatherRes] = await Promise.all([
         api.get('/bookings/requests/'),
         api.get('/bookings/'),
         api.get('/farm-projects/projects/'),
-        api.get('/farm-projects/farms/')
+        api.get('/farm-projects/farms/'),
+        api.get(`/services/weather/?district=${user?.district || 'Meerut'}`).catch(() => ({ data: null }))
       ]);
       setRequests(reqRes.data);
       setBookings(bookRes.data);
       setProjects(projRes.data);
       setFarms(farmRes.data);
+      if (weatherRes?.data) setWeather(weatherRes.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -109,6 +112,54 @@ export default function FarmerOverview() {
           </div>
         </div>
       </div>
+
+      {/* Weather Intelligence Card (Module 05) */}
+      {weather && (
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#F5F1E6] flex items-center justify-center text-[#174D32] shrink-0">
+              <CloudSun className="w-6 h-6 text-[#84B547]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black text-slate-800">
+                  {weather.current?.temperature_c}°C
+                </span>
+                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                  {lang === 'hi' ? weather.current?.condition_hi : weather.current?.condition_en}
+                </span>
+                <span className="text-[10px] text-emerald-700 bg-emerald-50 font-semibold px-2 py-0.5 rounded-full">
+                  {weather.is_live ? (lang === 'hi' ? 'लाइव मौसम' : 'Live Data') : (lang === 'hi' ? 'मौसमी मानक' : 'Seasonal Benchmark')}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                <span className="flex items-center gap-1">
+                  <Droplets className="w-3.5 h-3.5 text-blue-500" />
+                  {weather.current?.humidity_percent}% {lang === 'hi' ? 'नमी' : 'Humidity'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Wind className="w-3.5 h-3.5 text-slate-400" />
+                  {weather.current?.wind_speed_kmh} km/h
+                </span>
+                <span>{weather.location?.district || 'Meerut'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:max-w-md bg-emerald-50/60 border border-emerald-100/80 rounded-2xl p-3.5 text-xs text-emerald-950">
+            <span className="font-bold text-[#174D32] block mb-0.5">
+              {lang === 'hi' ? '🌾 कृषि-मौसम सलाह:' : '🌾 Agro-Advisory:'}
+            </span>
+            <p className="text-[11px] leading-relaxed text-emerald-900">
+              {lang === 'hi' ? weather.agro_advisory_hi : weather.agro_advisory_en}
+            </p>
+            <div className="mt-1 text-[9px] text-slate-400 flex items-center justify-between">
+              <span>{weather.attribution}</span>
+              <span>{weather.booking_policy}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

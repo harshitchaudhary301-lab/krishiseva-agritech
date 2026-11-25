@@ -102,7 +102,7 @@ class Quotation(models.Model):
         super().save(*args, **kwargs)
 
     def is_expired(self):
-        if self.expiry_date and self.expiry_date < timezone.now().date():
+        if self.expiry_date and self.expiry_date < timezone.localdate():
             return True
         return False
 

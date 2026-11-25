@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import (
     Farm, Field, CropTemplate, CropOperationTemplate,
     FarmProject, ProjectOperation, ProjectService,
-    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment
+    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment,
+    SoilReport, SeedProcurementRecord, CropObservation, PostHarvestRecord
 )
 from services.serializers import ServiceCategorySerializer
 from bookings.serializers import ServiceRequestSerializer
@@ -10,7 +11,10 @@ from bookings.serializers import ServiceRequestSerializer
 class FieldSerializer(serializers.ModelSerializer):
     class Meta:
         model = Field
-        fields = ['id', 'farm', 'name', 'area_acres', 'soil_type', 'irrigation_status', 'created_at']
+        fields = [
+            'id', 'farm', 'name', 'khasra_number', 'area_acres',
+            'soil_type', 'irrigation_status', 'latitude', 'longitude', 'created_at'
+        ]
         read_only_fields = ['created_at']
 
 
@@ -20,9 +24,10 @@ class FarmSerializer(serializers.ModelSerializer):
     class Meta:
         model = Farm
         fields = [
-            'id', 'farmer', 'name', 'village', 'district', 'state',
-            'size_acres', 'current_crops', 'soil_type', 'irrigation_source',
-            'fields', 'created_at'
+            'id', 'farmer', 'name', 'village', 'block', 'district', 'state',
+            'lgd_code', 'land_tenure', 'size_acres', 'original_area_unit',
+            'latitude', 'longitude', 'current_crops', 'soil_type', 'irrigation_source',
+            'history_notes', 'fields', 'created_at'
         ]
         read_only_fields = ['farmer', 'created_at']
 
@@ -200,3 +205,69 @@ class FarmProjectSerializer(serializers.ModelSerializer):
 
     def get_financial_summary(self, obj):
         return obj.get_financial_summary()
+
+
+class SoilReportSerializer(serializers.ModelSerializer):
+    farmer_name = serializers.CharField(source='farmer.get_full_name', read_only=True)
+    farm_name = serializers.CharField(source='farm.name', read_only=True)
+    field_name = serializers.CharField(source='field.name', read_only=True)
+
+    class Meta:
+        model = SoilReport
+        fields = [
+            'id', 'farmer', 'farmer_name', 'farm', 'farm_name', 'field', 'field_name',
+            'sampling_date', 'report_date', 'lab_name', 'sample_id', 'soil_texture',
+            'ph', 'ec', 'organic_carbon_percent', 'nitrogen_kg_ha', 'phosphorus_kg_ha',
+            'potassium_kg_ha', 'zinc_ppm', 'iron_ppm', 'document_reference', 'notes',
+            'created_at'
+        ]
+        read_only_fields = ['farmer', 'farm', 'created_at']
+
+
+class SeedProcurementRecordSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    status_display = serializers.CharField(source='get_procurement_status_display', read_only=True)
+
+    class Meta:
+        model = SeedProcurementRecord
+        fields = [
+            'id', 'project', 'project_name', 'crop', 'variety_name', 'source_breeder',
+            'required_quantity', 'quantity_unit', 'procurement_status', 'status_display',
+            'supplier_name', 'purchase_date', 'lot_number', 'recorded_cost',
+            'notes', 'created_at'
+        ]
+        read_only_fields = ['project', 'created_at']
+
+
+class CropObservationSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    operation_name = serializers.CharField(source='operation.operation_name_en', read_only=True)
+    condition_display = serializers.CharField(source='get_crop_condition_display', read_only=True)
+    follow_up_display = serializers.CharField(source='get_follow_up_status_display', read_only=True)
+
+    class Meta:
+        model = CropObservation
+        fields = [
+            'id', 'project', 'project_name', 'operation', 'operation_name',
+            'observation_date', 'growth_stage', 'crop_condition', 'condition_display',
+            'field_notes', 'reported_concerns', 'follow_up_status', 'follow_up_display',
+            'photo_reference', 'created_at'
+        ]
+        read_only_fields = ['project', 'created_at']
+
+
+class PostHarvestRecordSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    sale_status_display = serializers.CharField(source='get_sale_status_display', read_only=True)
+
+    class Meta:
+        model = PostHarvestRecord
+        fields = [
+            'id', 'project', 'project_name', 'harvest_date', 'produce_quantity',
+            'quantity_unit', 'quality_grade', 'moisture_content_percent',
+            'storage_type', 'storage_location', 'storage_duration_days',
+            'storage_cost_inr', 'transport_required', 'transport_cost_inr',
+            'sale_status', 'sale_status_display', 'notes', 'created_at'
+        ]
+        read_only_fields = ['project', 'created_at']
+

@@ -3,7 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FolderKanban, Plus, CheckCircle2, Clock, Calendar,
   Tractor, Users, Wrench, Droplet, Truck, Building2, AlertTriangle,
-  ArrowRight, IndianRupee, Loader2, Sparkles, ShieldCheck
+  ArrowRight, IndianRupee, Loader2, Sparkles, ShieldCheck,
+  Sprout, Eye, PackageCheck, Warehouse, ShieldAlert, Check
 } from 'lucide-react';
 import api from '../../api/client';
 import { useLanguage } from '../../context/LanguageContext';
@@ -17,34 +18,98 @@ export default function FarmerProjectDetail() {
 
   const [project, setProject] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [seeds, setSeeds] = useState([]);
+  const [observations, setObservations] = useState([]);
+  const [postHarvestRecords, setPostHarvestRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [createReqOpen, setCreateReqOpen] = useState(false);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [scopeDesc, setScopeDesc] = useState('');
   const [addingService, setAddingService] = useState(false);
-  const [activeTab, setActiveTab] = useState('operations'); // 'operations' | 'services' | 'finance'
+
+  // Modals for new modules
+  const [showSeedModal, setShowSeedModal] = useState(false);
+  const [showObsModal, setShowObsModal] = useState(false);
+  const [showPostHarvestModal, setShowPostHarvestModal] = useState(false);
+  const [submittingModal, setSubmittingModal] = useState(false);
+
+  // Active workspace tab
+  const [activeTab, setActiveTab] = useState('operations'); // 'operations' | 'services' | 'finance' | 'seeds' | 'monitoring' | 'post_harvest'
   const [error, setError] = useState('');
+
+  // Form states
+  const [seedForm, setSeedForm] = useState({
+    crop: '',
+    variety: 'HD-3226 (Pusa Yashasvi)',
+    breeder_source: 'ICAR-IIWBR Karnal / NSC',
+    required_quantity: '40.0',
+    unit: 'kg',
+    procurement_status: 'procured',
+    supplier_name: 'National Seeds Corporation Meerut',
+    purchase_date: new Date().toISOString().split('T')[0],
+    lot_number: 'NSC-2026-WHT-89',
+    recorded_cost: '1800.00'
+  });
+
+  const [obsForm, setObsForm] = useState({
+    growth_stage: 'Tillering / Vegetative',
+    crop_condition: 'healthy',
+    field_notes: 'Uniform emergence across plots. Irrigation completed smoothly.',
+    reported_concerns: 'None'
+  });
+
+  const [postHarvestForm, setPostHarvestForm] = useState({
+    harvest_date: new Date().toISOString().split('T')[0],
+    produce_quantity: '220.0',
+    unit: 'quintal',
+    quality_grade: 'Grade A',
+    storage_type: 'warehouse',
+    storage_location: 'Central Warehousing Corporation Meerut',
+    storage_days: '45',
+    storage_cost: '2200.00',
+    transport_required: true,
+    transport_cost: '1500.00',
+    sale_status: 'in_storage'
+  });
 
   const handleCompleteOperation = async (opId) => {
     try {
-      await api.patch(`/farm-projects/operations/${opId}/`, { status: 'completed' });
+      await api.post(`/farm-projects/operations/${opId}/mark-completed/`, {
+        notes: 'Completed by farmer via platform manager.'
+      });
       fetchProjectDetails();
     } catch (err) {
-      console.error(err);
-      alert('Failed to mark operation completed.');
+      console.warn('Fallback to patch operation status', err);
+      try {
+        await api.patch(`/farm-projects/operations/${opId}/`, { status: 'completed' });
+        fetchProjectDetails();
+      } catch (patchErr) {
+        console.error(patchErr);
+        alert('Failed to mark operation completed.');
+      }
     }
   };
 
   const fetchProjectDetails = async () => {
     setLoading(true);
     try {
-      const [projRes, catRes] = await Promise.all([
+      const [projRes, catRes, seedsRes, obsRes, phRes] = await Promise.all([
         api.get(`/farm-projects/projects/${id}/`),
-        api.get('/services/categories/')
+        api.get('/services/categories/'),
+        api.get(`/farm-projects/projects/${id}/seeds/`).catch(() => ({ data: [] })),
+        api.get(`/farm-projects/projects/${id}/observations/`).catch(() => ({ data: [] })),
+        api.get(`/farm-projects/projects/${id}/post-harvest/`).catch(() => ({ data: [] }))
       ]);
       setProject(projRes.data);
       setCategories(catRes.data);
+      setSeeds(seedsRes.data);
+      setObservations(obsRes.data);
+      setPostHarvestRecords(phRes.data);
+      if (projRes.data?.crop && !seedForm.crop) {
+        setSeedForm(prev => ({ ...prev, crop: projRes.data.crop }));
+      }
     } catch (err) {
       console.error(err);
       setError('Failed to load farm project.');
@@ -76,6 +141,61 @@ export default function FarmerProjectDetail() {
       alert('Failed to attach service to project.');
     } finally {
       setAddingService(false);
+    }
+  };
+
+  const handleAddSeed = async (e) => {
+    e.preventDefault();
+    setSubmittingModal(true);
+    try {
+      await api.post(`/farm-projects/projects/${id}/seeds/`, {
+        ...seedForm,
+        required_quantity: parseFloat(seedForm.required_quantity),
+        recorded_cost: parseFloat(seedForm.recorded_cost)
+      });
+      setShowSeedModal(false);
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save seed procurement record.');
+    } finally {
+      setSubmittingModal(false);
+    }
+  };
+
+  const handleAddObservation = async (e) => {
+    e.preventDefault();
+    setSubmittingModal(true);
+    try {
+      await api.post(`/farm-projects/projects/${id}/observations/`, obsForm);
+      setShowObsModal(false);
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save crop observation.');
+    } finally {
+      setSubmittingModal(false);
+    }
+  };
+
+  const handleAddPostHarvest = async (e) => {
+    e.preventDefault();
+    setSubmittingModal(true);
+    try {
+      await api.post(`/farm-projects/projects/${id}/post-harvest/`, {
+        ...postHarvestForm,
+        produce_quantity: parseFloat(postHarvestForm.produce_quantity),
+        storage_days: parseInt(postHarvestForm.storage_days, 10),
+        storage_cost: parseFloat(postHarvestForm.storage_cost),
+        transport_cost: parseFloat(postHarvestForm.transport_cost)
+      });
+      setShowPostHarvestModal(false);
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save post-harvest record.');
+    } finally {
+      setSubmittingModal(false);
     }
   };
 
@@ -194,7 +314,7 @@ export default function FarmerProjectDetail() {
               </strong>
               <p className="leading-relaxed">
                 {lang === 'hi'
-                  ? `इस प्रोजेक्ट में ${unconfirmedServices.length} सेवा अभी भी पुष्टि की प्रतीक्षा में है (जैसे ट्रैक्टर मैकेनिक)। जब तक सभी आवश्यक सेवाओं की बुकिंग पक्की नहीं हो जाती, प्रोजेक्ट को "तैयार" मार्क नहीं किया जा सकता।`
+                  ? `इस प्रोजेक्ट में ${unconfirmedServices.length} सेवा अभी भी पुष्टि की प्रतीक्षा में है। जब तक सभी आवश्यक सेवाओं की बुकिंग पक्की नहीं हो जाती, प्रोजेक्ट को "तैयार" मार्क नहीं किया जा सकता।`
                   : `Essential services (${unconfirmedServices.map(s => s.category_details?.name_en).join(', ')}) are still unconfirmed. As per KrishiSeva platform rules, the project cannot be marked Ready until all bookings are verified.`}
               </p>
             </div>
@@ -351,54 +471,127 @@ export default function FarmerProjectDetail() {
         </div>
       </div>
 
-      {/* 3-Way Project Workspace Tabs: Operations, Services, Financials */}
+      {/* Multi-Module Project Workspace Tabs */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setActiveTab('operations')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'operations'
                   ? 'bg-[#174D32] text-white shadow-sm'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{lang === 'hi' ? 'फसल कार्य सूची' : 'Crop Operations'}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === 'operations' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'कार्य सूची' : 'Operations'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'operations' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                 {project.project_operations?.length || 0}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('services')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'services'
                   ? 'bg-[#174D32] text-white shadow-sm'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              <Tractor className="w-4 h-4" />
-              <span>{lang === 'hi' ? 'समन्वित सेवाएं' : 'Service Bookings'}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === 'services' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+              <Tractor className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'सेवा बुकिंग' : 'Bookings'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'services' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                 {project.project_services?.length || 0}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('finance')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'finance'
                   ? 'bg-[#174D32] text-white shadow-sm'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              <IndianRupee className="w-4 h-4" />
-              <span>{lang === 'hi' ? 'फार्म वित्तीय योजना' : 'Financial Planner'}</span>
-              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-black">
-                FIN-01..12
+              <IndianRupee className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'वित्तीय खाता' : 'Financial Ledger'}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('seeds')}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'seeds'
+                  ? 'bg-[#174D32] text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Sprout className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'बीज संदर्भ (Seed)' : 'Seed Records'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'seeds' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {seeds.length}
               </span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('monitoring')}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'monitoring'
+                  ? 'bg-[#174D32] text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'फसल निगरानी' : 'Crop Observations'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'monitoring' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {observations.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('post_harvest')}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'post_harvest'
+                  ? 'bg-[#174D32] text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Warehouse className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'कटाई उपरांत' : 'Post-Harvest'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'post_harvest' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {postHarvestRecords.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Action button inside tab bar */}
+          <div>
+            {activeTab === 'seeds' && (
+              <button
+                onClick={() => setShowSeedModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#174D32] text-white text-xs font-bold hover:bg-[#0e3321] transition flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{lang === 'hi' ? 'बीज खरीद दर्ज करें' : 'Log Seed Procurement'}</span>
+              </button>
+            )}
+            {activeTab === 'monitoring' && (
+              <button
+                onClick={() => setShowObsModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#174D32] text-white text-xs font-bold hover:bg-[#0e3321] transition flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{lang === 'hi' ? 'निगरानी नोट जोड़ें' : 'Log Field Observation'}</span>
+              </button>
+            )}
+            {activeTab === 'post_harvest' && (
+              <button
+                onClick={() => setShowPostHarvestModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#174D32] text-white text-xs font-bold hover:bg-[#0e3321] transition flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{lang === 'hi' ? 'कटाई उपज दर्ज करें' : 'Record Harvest Yield'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -469,9 +662,10 @@ export default function FarmerProjectDetail() {
                           <button
                             onClick={() => handleCompleteOperation(op.id)}
                             className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            title="Mark completed directly and unlock dependent tasks"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{lang === 'hi' ? 'पूर्ण मार्क करें' : 'Mark Completed'}</span>
+                            <span>{lang === 'hi' ? 'स्वयं पूर्ण मार्क करें' : 'Mark Completed (Manual)'}</span>
                           </button>
                         )}
                         {isDone && (
@@ -654,12 +848,6 @@ export default function FarmerProjectDetail() {
                     <span>Net Recorded Payments:</span>
                     <span className="text-emerald-700">₹{Number(project.financial_summary.net_recorded_payments).toLocaleString()}</span>
                   </div>
-                  {Number(project.financial_summary.overpayment_balance) > 0 && (
-                    <div className="flex justify-between py-1 text-amber-800 font-bold bg-amber-50 px-2 rounded-lg">
-                      <span>Overpayment Balance (FIN-07):</span>
-                      <span>₹{Number(project.financial_summary.overpayment_balance).toLocaleString()}</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Right: Revenue & Surplus */}
@@ -698,6 +886,177 @@ export default function FarmerProjectDetail() {
             </div>
           </div>
         )}
+
+        {/* TAB 4: Seed Intelligence (Module 04) */}
+        {activeTab === 'seeds' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
+              <span>{lang === 'hi' ? 'बीज विविधता, स्रोत एवं खरीद विवरण' : 'Seed Variety Reference, Breeder Source & Procurement Records'}</span>
+              <span>{seeds.length} Records</span>
+            </div>
+
+            {seeds.length === 0 ? (
+              <div className="p-10 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+                <Sprout className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {lang === 'hi' ? 'कोई बीज खरीद रिकॉर्ड नहीं है' : 'No seed procurement records yet'}
+                </h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Record breeder sources (ICAR/NSC), certified lot numbers, and costs for transparent crop input tracking.
+                </p>
+                <button
+                  onClick={() => setShowSeedModal(true)}
+                  className="px-4 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold"
+                >
+                  {lang === 'hi' ? 'बीज रिकॉर्ड जोड़ें' : 'Add First Seed Record'}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {seeds.map((s) => (
+                  <div key={s.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between border-b border-slate-100 pb-2">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Crop Variety</span>
+                        <h4 className="font-bold text-slate-900 text-base">{s.variety}</h4>
+                        <span className="text-xs text-slate-500">{s.crop}</span>
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                        s.procurement_status === 'procured' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {s.procurement_status}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <div><strong>Breeder Source:</strong> {s.breeder_source}</div>
+                      <div><strong>Supplier:</strong> {s.supplier_name || 'Direct / NSC'}</div>
+                      <div><strong>Lot Number:</strong> <span className="font-mono text-slate-700">{s.lot_number || 'N/A'}</span></div>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <span>Quantity: <strong>{s.required_quantity} {s.unit}</strong></span>
+                        <span className="font-bold text-[#174D32]">Cost: ₹{Number(s.recorded_cost).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: Crop Monitoring & Observations (Module 09) */}
+        {activeTab === 'monitoring' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
+              <span>{lang === 'hi' ? 'खेत निरीक्षण एवं कीट/रोग स्थिति' : 'Field Inspection, Phenological Growth Stages & Pest Status'}</span>
+              <span>{observations.length} Observations</span>
+            </div>
+
+            {observations.length === 0 ? (
+              <div className="p-10 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+                <Eye className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {lang === 'hi' ? 'कोई फसल निरीक्षण रिकॉर्ड नहीं है' : 'No crop observations recorded yet'}
+                </h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Log crop growth stages, vegetative vigor, and pest alerts to maintain historical field health records.
+                </p>
+                <button
+                  onClick={() => setShowObsModal(true)}
+                  className="px-4 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold"
+                >
+                  {lang === 'hi' ? 'पहला निरीक्षण जोड़ें' : 'Log First Observation'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {observations.map((obs) => (
+                  <div key={obs.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-900">{obs.growth_stage}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          obs.crop_condition === 'healthy' ? 'bg-emerald-100 text-emerald-800' :
+                          obs.crop_condition === 'pest_attack' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          Condition: {obs.crop_condition}
+                        </span>
+                        <span className="text-[11px] text-slate-400">Date: {obs.observation_date}</span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">{obs.field_notes}</p>
+                      {obs.reported_concerns && obs.reported_concerns !== 'None' && (
+                        <div className="text-[11px] text-rose-700 flex items-center gap-1">
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          <span>Concern: {obs.reported_concerns}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 6: Post-Harvest Management (Module 10) */}
+        {activeTab === 'post_harvest' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
+              <span>{lang === 'hi' ? 'उपज मात्रा, भंडारण एवं परिवहन लागत' : 'Harvested Yield, Storage Type & Transport Integration'}</span>
+              <span>{postHarvestRecords.length} Records</span>
+            </div>
+
+            {postHarvestRecords.length === 0 ? (
+              <div className="p-10 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+                <Warehouse className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {lang === 'hi' ? 'कोई कटाई-उपरांत रिकॉर्ड नहीं है' : 'No post-harvest records logged yet'}
+                </h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Record actual harvested yield, quality grading, storage facilities, and transportation to mandis.
+                </p>
+                <button
+                  onClick={() => setShowPostHarvestModal(true)}
+                  className="px-4 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold"
+                >
+                  {lang === 'hi' ? 'उपज रिकॉर्ड दर्ज करें' : 'Record Harvest Yield'}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {postHarvestRecords.map((ph) => (
+                  <div key={ph.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between border-b border-slate-100 pb-2">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Yield Record</span>
+                        <h4 className="font-black text-slate-900 text-lg">
+                          {ph.produce_quantity} {ph.unit}
+                        </h4>
+                        <span className="text-xs text-slate-500">Harvest Date: {ph.harvest_date}</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                        {ph.quality_grade}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <div><strong>Storage:</strong> {ph.storage_type} ({ph.storage_days} days)</div>
+                      <div><strong>Location:</strong> {ph.storage_location || 'Local facility'}</div>
+                      <div className="flex justify-between py-1 border-t border-slate-100">
+                        <span>Storage Cost: <strong>₹{Number(ph.storage_cost).toLocaleString()}</strong></span>
+                        <span>Transport Cost: <strong>₹{Number(ph.transport_cost).toLocaleString()}</strong></span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-slate-400">Sale Status:</span>
+                        <span className="font-bold text-[#174D32] uppercase text-[11px]">{ph.sale_status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Add Service Modal */}
@@ -709,9 +1068,7 @@ export default function FarmerProjectDetail() {
                 <h3 className="text-lg font-bold">
                   {lang === 'hi' ? 'प्रोजेक्ट में नई सेवा जोड़ें' : 'Attach Service to Project'}
                 </h3>
-                <p className="text-xs text-emerald-100 mt-0.5">
-                  {project.name}
-                </p>
+                <p className="text-xs text-emerald-100 mt-0.5">{project.name}</p>
               </div>
               <button onClick={() => setShowAddServiceModal(false)} className="p-2 text-white/80 hover:text-white rounded-xl">
                 ✕
@@ -766,6 +1123,333 @@ export default function FarmerProjectDetail() {
                   className="px-5 py-2 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition disabled:opacity-50"
                 >
                   {addingService ? 'Adding...' : (lang === 'hi' ? 'सेवा जोड़ें' : 'Add Service')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add Seed Record (Module 04) */}
+      {showSeedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-6 bg-[#174D32] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Log Seed Procurement</h3>
+                <p className="text-xs text-emerald-100 mt-0.5">Module 04 • Seed Intelligence</p>
+              </div>
+              <button onClick={() => setShowSeedModal(false)} className="p-2 text-white/80 hover:text-white rounded-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleAddSeed} className="p-6 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Variety *</label>
+                <input
+                  type="text"
+                  value={seedForm.variety}
+                  onChange={(e) => setSeedForm({ ...seedForm, variety: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Breeder Source</label>
+                  <input
+                    type="text"
+                    value={seedForm.breeder_source}
+                    onChange={(e) => setSeedForm({ ...seedForm, breeder_source: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Supplier</label>
+                  <input
+                    type="text"
+                    value={seedForm.supplier_name}
+                    onChange={(e) => setSeedForm({ ...seedForm, supplier_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Qty</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={seedForm.required_quantity}
+                    onChange={(e) => setSeedForm({ ...seedForm, required_quantity: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Unit</label>
+                  <select
+                    value={seedForm.unit}
+                    onChange={(e) => setSeedForm({ ...seedForm, unit: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="quintal">quintal</option>
+                    <option value="packets">packets</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Cost (₹)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={seedForm.recorded_cost}
+                    onChange={(e) => setSeedForm({ ...seedForm, recorded_cost: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Lot Number</label>
+                  <input
+                    type="text"
+                    value={seedForm.lot_number}
+                    onChange={(e) => setSeedForm({ ...seedForm, lot_number: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Status</label>
+                  <select
+                    value={seedForm.procurement_status}
+                    onChange={(e) => setSeedForm({ ...seedForm, procurement_status: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  >
+                    <option value="procured">Procured</option>
+                    <option value="pending">Pending</option>
+                    <option value="sown">Sown</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowSeedModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingModal}
+                  className="px-5 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold transition disabled:opacity-50"
+                >
+                  {submittingModal ? 'Saving...' : 'Save Seed Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add Observation (Module 09) */}
+      {showObsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-6 bg-[#174D32] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Log Crop Observation</h3>
+                <p className="text-xs text-emerald-100 mt-0.5">Module 09 • Crop Monitoring</p>
+              </div>
+              <button onClick={() => setShowObsModal(false)} className="p-2 text-white/80 hover:text-white rounded-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleAddObservation} className="p-6 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Growth Stage *</label>
+                <input
+                  type="text"
+                  value={obsForm.growth_stage}
+                  onChange={(e) => setObsForm({ ...obsForm, growth_stage: e.target.value })}
+                  placeholder="e.g. Vegetative, Tillering, Flowering"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Crop Condition</label>
+                <select
+                  value={obsForm.crop_condition}
+                  onChange={(e) => setObsForm({ ...obsForm, crop_condition: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                >
+                  <option value="healthy">Healthy (स्वस्थ)</option>
+                  <option value="normal">Normal (सामान्य)</option>
+                  <option value="stressed">Stressed (तनावग्रस्त - नमी/गर्मी)</option>
+                  <option value="pest_attack">Pest Attack (कीट प्रकोप)</option>
+                  <option value="disease">Disease (रोग प्रकोप)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Field Notes</label>
+                <textarea
+                  rows={2}
+                  value={obsForm.field_notes}
+                  onChange={(e) => setObsForm({ ...obsForm, field_notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  placeholder="Notes on stand, vigor, moisture..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Reported Concerns</label>
+                <input
+                  type="text"
+                  value={obsForm.reported_concerns}
+                  onChange={(e) => setObsForm({ ...obsForm, reported_concerns: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  placeholder="e.g. Mild aphid presence near border"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowObsModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingModal}
+                  className="px-5 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold transition disabled:opacity-50"
+                >
+                  {submittingModal ? 'Saving...' : 'Save Observation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add Post Harvest (Module 10) */}
+      {showPostHarvestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-6 bg-[#174D32] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Record Harvest Yield</h3>
+                <p className="text-xs text-emerald-100 mt-0.5">Module 10 • Post-Harvest Management</p>
+              </div>
+              <button onClick={() => setShowPostHarvestModal(false)} className="p-2 text-white/80 hover:text-white rounded-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleAddPostHarvest} className="p-6 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Quantity *</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={postHarvestForm.produce_quantity}
+                    onChange={(e) => setPostHarvestForm({ ...postHarvestForm, produce_quantity: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Unit</label>
+                  <select
+                    value={postHarvestForm.unit}
+                    onChange={(e) => setPostHarvestForm({ ...postHarvestForm, unit: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  >
+                    <option value="quintal">quintal</option>
+                    <option value="ton">ton</option>
+                    <option value="kg">kg</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Grade</label>
+                  <input
+                    type="text"
+                    value={postHarvestForm.quality_grade}
+                    onChange={(e) => setPostHarvestForm({ ...postHarvestForm, quality_grade: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Storage Type</label>
+                  <select
+                    value={postHarvestForm.storage_type}
+                    onChange={(e) => setPostHarvestForm({ ...postHarvestForm, storage_type: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  >
+                    <option value="warehouse">Warehouse</option>
+                    <option value="farm_storage">Farm Storage</option>
+                    <option value="cold_storage">Cold Storage</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Storage Facility Location</label>
+                <input
+                  type="text"
+                  value={postHarvestForm.storage_location}
+                  onChange={(e) => setPostHarvestForm({ ...postHarvestForm, storage_location: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Storage Cost (₹)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={postHarvestForm.storage_cost}
+                    onChange={(e) => setPostHarvestForm({ ...postHarvestForm, storage_cost: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Transport Cost (₹)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={postHarvestForm.transport_cost}
+                    onChange={(e) => setPostHarvestForm({ ...postHarvestForm, transport_cost: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowPostHarvestModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingModal}
+                  className="px-5 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold transition disabled:opacity-50"
+                >
+                  {submittingModal ? 'Saving...' : 'Save Harvest Record'}
                 </button>
               </div>
             </form>

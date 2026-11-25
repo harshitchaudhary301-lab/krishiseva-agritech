@@ -4,15 +4,28 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 class Farm(models.Model):
+    TENURE_CHOICES = [
+        ('owned', 'Owner Cultivator'),
+        ('leased', 'Leased In'),
+        ('sharecropped', 'Sharecropped'),
+    ]
+
     farmer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='farms')
     name = models.CharField(max_length=150, help_text="e.g. Ganga Khet, North Farm")
     village = models.CharField(max_length=100, default='Daurala')
+    block = models.CharField(max_length=100, blank=True, default='Daurala')
     district = models.CharField(max_length=100, default='Meerut')
     state = models.CharField(max_length=100, default='Uttar Pradesh')
-    size_acres = models.DecimalField(max_digits=6, decimal_places=2, default=10.0)
+    lgd_code = models.CharField(max_length=50, blank=True, default='', help_text="Local Government Directory administrative code")
+    land_tenure = models.CharField(max_length=50, choices=TENURE_CHOICES, default='owned')
+    size_acres = models.DecimalField(max_digits=6, decimal_places=2, default=10.0, help_text="Standardized area in acres")
+    original_area_unit = models.CharField(max_length=50, default='acre', help_text="Original measurement unit (Acre, Bigha, Hectare)")
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Consented farm center coordinate")
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Consented farm center coordinate")
     current_crops = models.CharField(max_length=255, default='Wheat')
     soil_type = models.CharField(max_length=100, blank=True, default='Alluvial Loam')
     irrigation_source = models.CharField(max_length=100, blank=True, default='Tubewell + Canal')
+    history_notes = models.TextField(blank=True, default='', help_text="Historical cropping and soil management notes")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -22,9 +35,12 @@ class Farm(models.Model):
 class Field(models.Model):
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name='fields')
     name = models.CharField(max_length=150, help_text="e.g. North Plot, Tubewell Khet, Khasra 402")
+    khasra_number = models.CharField(max_length=100, blank=True, default='', help_text="Official parcel identifier / survey number")
     area_acres = models.DecimalField(max_digits=6, decimal_places=2, default=5.0)
     soil_type = models.CharField(max_length=100, blank=True, default='Alluvial Loam')
     irrigation_status = models.CharField(max_length=100, blank=True, default='Tubewell Irrigated')
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -338,6 +354,28 @@ class ProjectOperation(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
+    def mark_completed_manually(self, notes=''):
+        """
+        Allows farmer to manually record an operation completed without purchasing an external service.
+        Updates dependent operations from 'awaiting_prerequisite' to 'ready'.
+        """
+        self.status = 'completed'
+        self.is_manual = True
+        self.actual_completion_date = timezone.localdate()
+        if not self.actual_start_date:
+            self.actual_start_date = self.planned_start_date or timezone.localdate()
+        if notes:
+            self.notes = f"{self.notes}\n[Manual Completion] {notes}".strip()
+        self.save()
+
+        # Update dependent operations
+        for dep in self.dependent_operations.filter(status='awaiting_prerequisite'):
+            dep.status = 'ready'
+            dep.save()
+
+        self.project.update_project_status()
+        return self
+
     def __str__(self):
         return f"{self.project.name} | #{self.sequence_order} {self.operation_name_en} ({self.get_status_display()})"
 
@@ -440,7 +478,7 @@ class PaymentRecord(models.Model):
     payment_mode = models.CharField(max_length=50, default='Direct UPI / Cash (Platform Ledger Recording)')
     transaction_reference = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
-    payment_date = models.DateField(default=timezone.now)
+    payment_date = models.DateField(default=timezone.localdate)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -474,4 +512,175 @@ class RevenueRecord(models.Model):
 
     def __str__(self):
         return f"{self.project.name} | Revenue: ₹{self.total_realized_revenue} ({self.quantity_quintals} Qtl @ ₹{self.rate_per_quintal})"
+
+
+class SoilReport(models.Model):
+    """
+    Module 02: Soil Intelligence
+    Farmer-entered laboratory soil test and Soil Health Card records.
+    Associated with farm and optional field parcel.
+    """
+    farmer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='soil_reports')
+    farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name='soil_reports')
+    field = models.ForeignKey(Field, on_delete=models.SET_NULL, null=True, blank=True, related_name='soil_reports')
+    sampling_date = models.DateField(default=timezone.localdate)
+    report_date = models.DateField(null=True, blank=True)
+    lab_name = models.CharField(max_length=200, help_text="e.g. District Soil Testing Lab Meerut / KVK / ICAR")
+    sample_id = models.CharField(max_length=100, blank=True, help_text="Sample identifier or Soil Health Card number")
+    soil_texture = models.CharField(max_length=100, blank=True, default='Loam', help_text="e.g. Alluvial Loam, Sandy Loam, Clay Loam")
+    ph = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True, help_text="Soil pH (e.g. 7.20)")
+    ec = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Electrical Conductivity dS/m")
+    organic_carbon_percent = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True, help_text="Organic Carbon %")
+    nitrogen_kg_ha = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Available Nitrogen (N) kg/ha")
+    phosphorus_kg_ha = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Available Phosphorus (P) kg/ha")
+    potassium_kg_ha = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Available Potassium (K) kg/ha")
+    zinc_ppm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Available Zinc (ppm)")
+    iron_ppm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Available Iron (ppm)")
+    document_reference = models.CharField(max_length=255, blank=True, help_text="SHC Reference / Document Token")
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sampling_date', '-created_at']
+
+    def __str__(self):
+        fld = f" - {self.field.name}" if self.field else ""
+        return f"Soil Report: {self.farm.name}{fld} ({self.sampling_date})"
+
+
+class SeedProcurementRecord(models.Model):
+    """
+    Module 04: Seed Intelligence
+    Tracks variety selection, procurement status, seed source, quantity, and cost.
+    Automatically connects to farm project and creates/updates financial records.
+    """
+    PROCUREMENT_STATUS_CHOICES = [
+        ('planned', 'Planned / Required'),
+        ('procured', 'Procured / In Stock'),
+        ('treated', 'Seed Treated'),
+        ('sown', 'Sown in Field'),
+    ]
+
+    UNIT_CHOICES = [
+        ('kg', 'Kilograms (kg)'),
+        ('quintal', 'Quintals (qtl)'),
+        ('packet', 'Packets'),
+        ('seedling', 'Seedlings / Tubers'),
+    ]
+
+    project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='seed_records')
+    crop = models.CharField(max_length=100)
+    variety_name = models.CharField(max_length=150, help_text="e.g. HD-2967, PBW-343, Co-0238, Pusa Mustard 25")
+    source_breeder = models.CharField(max_length=150, blank=True, help_text="e.g. ICAR-IIWBR, National Seeds Corp, State Seed Dept")
+    required_quantity = models.DecimalField(max_digits=8, decimal_places=2)
+    quantity_unit = models.CharField(max_length=30, choices=UNIT_CHOICES, default='kg')
+    procurement_status = models.CharField(max_length=30, choices=PROCUREMENT_STATUS_CHOICES, default='planned')
+    supplier_name = models.CharField(max_length=200, blank=True)
+    purchase_date = models.DateField(null=True, blank=True)
+    lot_number = models.CharField(max_length=100, blank=True)
+    recorded_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.crop} - {self.variety_name} ({self.required_quantity} {self.quantity_unit}) [{self.get_procurement_status_display()}]"
+
+
+class CropObservation(models.Model):
+    """
+    Module 09: Crop Monitoring
+    Manual field observation records entered by the farmer.
+    Integrated into Farm Project Manager timeline.
+    """
+    CONDITION_CHOICES = [
+        ('excellent', 'Excellent (उत्कृष्ट)'),
+        ('good', 'Good (अच्छा)'),
+        ('fair', 'Fair / Average (सामान्य)'),
+        ('poor', 'Poor (कमजोर)'),
+        ('stressed', 'Stressed / Needs Attention (तनावग्रस्त)'),
+    ]
+
+    FOLLOW_UP_CHOICES = [
+        ('none', 'No Action Required (कोई कार्रवाई नहीं)'),
+        ('monitoring', 'Active Monitoring (सक्रिय निगरानी)'),
+        ('action_required', 'Field Action Required (कार्रवाई आवश्यक)'),
+        ('resolved', 'Resolved (समाधान किया गया)'),
+    ]
+
+    project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='observations')
+    operation = models.ForeignKey(ProjectOperation, on_delete=models.SET_NULL, null=True, blank=True, related_name='observations')
+    observation_date = models.DateField(default=timezone.localdate)
+    growth_stage = models.CharField(max_length=100, help_text="e.g. Crown Root Initiation, Tillering, Flowering, Grain Filling")
+    crop_condition = models.CharField(max_length=50, choices=CONDITION_CHOICES, default='good')
+    field_notes = models.TextField(help_text="Farmer field observations, canopy status, moisture condition")
+    reported_concerns = models.CharField(max_length=200, blank=True, help_text="e.g. Minor yellowing, lodging risk, waterlogging")
+    follow_up_status = models.CharField(max_length=50, choices=FOLLOW_UP_CHOICES, default='monitoring')
+    photo_reference = models.CharField(max_length=255, blank=True, help_text="Secure photographic reference token")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-observation_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.project.name} | {self.growth_stage} ({self.observation_date}) - {self.get_crop_condition_display()}"
+
+
+class PostHarvestRecord(models.Model):
+    """
+    Module 10: Post-Harvest Management
+    Tracks harvest completion, produce volume, quality grading, on-farm/commercial storage,
+    and connects to marketplace for transportation/storage requests and finance for revenues.
+    """
+    UNIT_CHOICES = [
+        ('quintal', 'Quintals (qtl)'),
+        ('ton', 'Metric Tons'),
+        ('bag', 'Bags (50kg)'),
+        ('crate', 'Crates'),
+    ]
+
+    GRADE_CHOICES = [
+        ('Grade A', 'Grade A (FAQ - Fair Average Quality)'),
+        ('Grade B', 'Grade B (Secondary)'),
+        ('Grade C', 'Grade C (Under-grade / Processing)'),
+        ('Premium', 'Premium Grade'),
+    ]
+
+    STORAGE_TYPE_CHOICES = [
+        ('on_farm', 'On-Farm Covered Shed'),
+        ('commercial_warehouse', 'Registered Warehouse (CWC / SWC)'),
+        ('cold_storage', 'Cold Storage Facility'),
+        ('direct_mandi', 'Directly Dispatched to Mandi / Mill'),
+    ]
+
+    SALE_STATUS_CHOICES = [
+        ('unsold', 'Unsold / In Storage'),
+        ('partially_sold', 'Partially Sold'),
+        ('sold', 'Completely Sold'),
+    ]
+
+    project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='post_harvest_records')
+    harvest_date = models.DateField(default=timezone.localdate)
+    produce_quantity = models.DecimalField(max_digits=10, decimal_places=2, help_text="Harvested yield quantity")
+    quantity_unit = models.CharField(max_length=30, choices=UNIT_CHOICES, default='quintal')
+    quality_grade = models.CharField(max_length=50, choices=GRADE_CHOICES, default='Grade A')
+    moisture_content_percent = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True, help_text="Reported grain/produce moisture %")
+    storage_type = models.CharField(max_length=50, choices=STORAGE_TYPE_CHOICES, default='on_farm')
+    storage_location = models.CharField(max_length=200, blank=True, help_text="Warehouse / facility address or on-farm shed")
+    storage_duration_days = models.IntegerField(default=0)
+    storage_cost_inr = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    transport_required = models.BooleanField(default=False)
+    transport_cost_inr = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    sale_status = models.CharField(max_length=30, choices=SALE_STATUS_CHOICES, default='unsold')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-harvest_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.project.name} Harvest: {self.produce_quantity} {self.quantity_unit} ({self.quality_grade}) [{self.get_sale_status_display()}]"
+
 

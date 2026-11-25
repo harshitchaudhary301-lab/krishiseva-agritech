@@ -8,12 +8,14 @@ from django.utils import timezone
 from .models import (
     Farm, Field, CropTemplate, CropOperationTemplate,
     FarmProject, ProjectOperation, ProjectService,
-    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment
+    ExpenseRecord, PaymentRecord, RevenueRecord, FinancialAdjustment,
+    SoilReport, SeedProcurementRecord, CropObservation, PostHarvestRecord
 )
 from .serializers import (
     FarmSerializer, FieldSerializer, CropTemplateSerializer,
     FarmProjectSerializer, ProjectOperationSerializer, ProjectServiceSerializer,
-    ExpenseRecordSerializer, PaymentRecordSerializer, RevenueRecordSerializer, FinancialAdjustmentSerializer
+    ExpenseRecordSerializer, PaymentRecordSerializer, RevenueRecordSerializer, FinancialAdjustmentSerializer,
+    SoilReportSerializer, SeedProcurementRecordSerializer, CropObservationSerializer, PostHarvestRecordSerializer
 )
 from bookings.models import ServiceRequest
 from services.models import ServiceCategory
@@ -372,4 +374,305 @@ class FinancialAdjustmentCreateView(APIView):
             adj = serializer.save(expense=expense, approved_by=request.user)
             return Response(FinancialAdjustmentSerializer(adj).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SoilReportListCreateView(APIView):
+    """
+    Module 02: Soil Intelligence
+    Lists and records laboratory soil reports and Soil Health Card records.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        farm_id = request.query_params.get('farm')
+        qs = SoilReport.objects.filter(farmer=request.user).select_related('farm', 'field')
+        if farm_id:
+            qs = qs.filter(farm_id=farm_id)
+        serializer = SoilReportSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        farm_id = request.data.get('farm')
+        farm = get_object_or_404(Farm, pk=farm_id, farmer=request.user)
+        field_id = request.data.get('field')
+        field = None
+        if field_id:
+            field = get_object_or_404(Field, pk=field_id, farm=farm)
+
+        serializer = SoilReportSerializer(data=request.data)
+        if serializer.is_valid():
+            report = serializer.save(farmer=request.user, farm=farm, field=field)
+            return Response(SoilReportSerializer(report).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SoilReportDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        report = get_object_or_404(SoilReport, pk=pk, farmer=request.user)
+        return Response(SoilReportSerializer(report).data)
+
+    def delete(self, request, pk):
+        report = get_object_or_404(SoilReport, pk=pk, farmer=request.user)
+        report.delete()
+        return Response({'message': 'Soil report deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class SeedProcurementRecordListCreateView(APIView):
+    """
+    Module 04: Seed Intelligence
+    Lists and records seed variety selection, procurement, and expenditure.
+    When seed cost > 0, automatically creates a linked commitment/incurred expense record.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        records = project.seed_records.all()
+        return Response(SeedProcurementRecordSerializer(records, many=True).data)
+
+    def post(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only project owner can record seed procurement.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = SeedProcurementRecordSerializer(data=request.data)
+        if serializer.is_valid():
+            seed_rec = serializer.save(project=project)
+            cost = serializer.validated_data.get('recorded_cost', 0)
+            if cost and float(cost) > 0:
+                # Connect directly to Farm Financial Planner (FIN-03)
+                ExpenseRecord.objects.create(
+                    project=project,
+                    title=f"Seed: {seed_rec.variety_name} ({seed_rec.required_quantity} {seed_rec.quantity_unit})",
+                    category='seeds',
+                    record_type='incurred' if seed_rec.procurement_status in ['procured', 'treated', 'sown'] else 'estimate',
+                    amount=cost,
+                    status='active',
+                    notes=f"Supplier: {seed_rec.supplier_name or 'Local Dealer'} | Lot: {seed_rec.lot_number or 'N/A'}"
+                )
+                project.update_project_status()
+
+            return Response(SeedProcurementRecordSerializer(seed_rec).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CropObservationListCreateView(APIView):
+    """
+    Module 09: Crop Monitoring
+    Lists and records manual crop observation notes, growth stages, and field concerns.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        observations = project.observations.select_related('operation').all()
+        return Response(CropObservationSerializer(observations, many=True).data)
+
+    def post(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only project owner can add observations.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = CropObservationSerializer(data=request.data)
+        if serializer.is_valid():
+            obs = serializer.save(project=project)
+            return Response(CropObservationSerializer(obs).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PostHarvestRecordListCreateView(APIView):
+    """
+    Module 10: Post-Harvest Management
+    Tracks harvested produce volume, grading, storage facility status, and related transportation.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        records = project.post_harvest_records.all()
+        return Response(PostHarvestRecordSerializer(records, many=True).data)
+
+    def post(self, request, project_pk):
+        project = get_object_or_404(FarmProject, pk=project_pk)
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only project owner can record post-harvest activities.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = PostHarvestRecordSerializer(data=request.data)
+        if serializer.is_valid():
+            ph_rec = serializer.save(project=project)
+
+            # Record storage or transport costs into financial planner if present
+            storage_cost = serializer.validated_data.get('storage_cost_inr', 0)
+            if storage_cost and float(storage_cost) > 0:
+                ExpenseRecord.objects.create(
+                    project=project,
+                    title=f"Post-Harvest Storage: {ph_rec.get_storage_type_display()} ({ph_rec.storage_duration_days} days)",
+                    category='storage',
+                    record_type='incurred',
+                    amount=storage_cost,
+                    status='active'
+                )
+
+            transport_cost = serializer.validated_data.get('transport_cost_inr', 0)
+            if transport_cost and float(transport_cost) > 0:
+                ExpenseRecord.objects.create(
+                    project=project,
+                    title=f"Post-Harvest Transport: {ph_rec.produce_quantity} {ph_rec.quantity_unit} to {ph_rec.storage_location or 'Facility'}",
+                    category='transportation',
+                    record_type='incurred',
+                    amount=transport_cost,
+                    status='active'
+                )
+
+            project.update_project_status()
+            return Response(PostHarvestRecordSerializer(ph_rec).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectOperationManualCompleteView(APIView):
+    """
+    Module 08: Farm Project Manager
+    Allows farmer to manually record an operation completed without purchasing an external service.
+    Unlocks dependent stages from 'awaiting_prerequisite' to 'ready'.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        operation = get_object_or_404(ProjectOperation, pk=pk)
+        if operation.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Only project owner can record manual task completion.'}, status=status.HTTP_403_FORBIDDEN)
+
+        notes = request.data.get('notes', 'Completed manually by farmer.')
+        updated_op = operation.mark_completed_manually(notes=notes)
+        return Response({
+            'message': f"Operation '{updated_op.operation_name_en}' marked as completed manually.",
+            'operation': ProjectOperationSerializer(updated_op).data,
+            'progress': updated_op.project.calculate_actual_progress()
+        })
+
+
+class FarmAnalyticsView(APIView):
+    """
+    Module 11: Farm Analytics
+    Provides descriptive operational and financial summaries aggregated across all farmer projects.
+    Uses authoritative database models as single source of truth (no duplicate calculation logic).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from decimal import Decimal
+        user = request.user
+        projects_qs = FarmProject.objects.filter(farmer=user)
+        total_projects = projects_qs.count()
+        active_projects = projects_qs.filter(status__in=['planning', 'ready', 'in_progress']).count()
+        completed_projects = projects_qs.filter(status='completed').count()
+
+        all_operations = ProjectOperation.objects.filter(project__farmer=user)
+        total_ops = all_operations.count()
+        completed_ops = all_operations.filter(status='completed').count()
+        ready_ops = all_operations.filter(status='ready').count()
+        today = timezone.localdate()
+        overdue_ops = all_operations.filter(
+            planned_end_date__lt=today
+        ).exclude(status__in=['completed', 'cancelled']).count()
+
+        # Cumulative Financials across all projects
+        cum_planned = Decimal('0.00')
+        cum_committed = Decimal('0.00')
+        cum_incurred = Decimal('0.00')
+        cum_payments = Decimal('0.00')
+        cum_outstanding = Decimal('0.00')
+        cum_revenue = Decimal('0.00')
+        cum_surplus = Decimal('0.00')
+        total_acres = Decimal('0.00')
+
+        project_summaries = []
+        crop_breakdown = {}
+
+        for p in projects_qs:
+            fin = p.get_financial_summary()
+            cum_planned += Decimal(fin['planned_estimates'])
+            cum_committed += Decimal(fin['confirmed_commitments'])
+            cum_incurred += Decimal(fin['incurred_expenditure'])
+            cum_payments += Decimal(fin['net_recorded_payments'])
+            cum_outstanding += Decimal(fin['outstanding_balance'])
+            cum_revenue += Decimal(fin['realized_revenue'])
+            cum_surplus += Decimal(fin['recorded_surplus'])
+
+            area = Decimal(str(p.target_area_acres or 0))
+            total_acres += area
+
+            prog = p.calculate_actual_progress()
+            project_summaries.append({
+                'id': p.id,
+                'name': p.name,
+                'crop': p.crop,
+                'variant': p.variant,
+                'status': p.status,
+                'progress_percentage': prog.get('percentage'),
+                'target_area_acres': str(area),
+                'incurred_expenditure': fin['incurred_expenditure'],
+                'realized_revenue': fin['realized_revenue'],
+                'recorded_surplus': fin['recorded_surplus']
+            })
+
+            crop_key = p.crop or 'Other'
+            if crop_key not in crop_breakdown:
+                crop_breakdown[crop_key] = {
+                    'project_count': 0,
+                    'total_acres': Decimal('0.00'),
+                    'incurred': Decimal('0.00'),
+                    'revenue': Decimal('0.00'),
+                    'surplus': Decimal('0.00')
+                }
+            crop_breakdown[crop_key]['project_count'] += 1
+            crop_breakdown[crop_key]['total_acres'] += area
+            crop_breakdown[crop_key]['incurred'] += Decimal(fin['incurred_expenditure'])
+            crop_breakdown[crop_key]['revenue'] += Decimal(fin['realized_revenue'])
+            crop_breakdown[crop_key]['surplus'] += Decimal(fin['recorded_surplus'])
+
+        # Format crop breakdown
+        formatted_crop_breakdown = {}
+        for c_name, c_data in crop_breakdown.items():
+            formatted_crop_breakdown[c_name] = {
+                'project_count': c_data['project_count'],
+                'total_acres': str(c_data['total_acres']),
+                'incurred': str(c_data['incurred']),
+                'revenue': str(c_data['revenue']),
+                'surplus': str(c_data['surplus'])
+            }
+
+        return Response({
+            'overview': {
+                'total_projects': total_projects,
+                'active_projects': active_projects,
+                'completed_projects': completed_projects,
+                'total_cultivated_acres': str(total_acres),
+                'total_operations': total_ops,
+                'completed_operations': completed_ops,
+                'ready_operations': ready_ops,
+                'overdue_operations': overdue_ops
+            },
+            'financial_totals': {
+                'planned_estimates': str(cum_planned),
+                'confirmed_commitments': str(cum_committed),
+                'incurred_expenditure': str(cum_incurred),
+                'net_recorded_payments': str(cum_payments),
+                'outstanding_balance': str(cum_outstanding),
+                'realized_revenue': str(cum_revenue),
+                'recorded_surplus': str(cum_surplus),
+                'economic_disclaimer': 'Descriptive operational and financial summary based on platform records; not a certified financial audit.'
+            },
+            'projects': project_summaries,
+            'crop_breakdown': formatted_crop_breakdown
+        })
+
 

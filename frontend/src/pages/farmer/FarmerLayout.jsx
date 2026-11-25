@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Search, FileText, CheckCircle2,
   FolderKanban, Calendar, HelpCircle, Settings, LogOut,
-  Sparkles, Globe, Menu, X, Tractor, Bell
+  Sparkles, Globe, Menu, X, Tractor, Bell, BarChart3
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -26,6 +26,7 @@ export default function FarmerLayout() {
     { name: lang === 'hi' ? 'मेरी बुकिंग्स' : 'My Bookings', path: '/farmer/bookings', icon: CheckCircle2 },
     { name: lang === 'hi' ? 'फार्म प्रोजेक्ट्स' : 'Farm Projects', path: '/farmer/projects', icon: FolderKanban, highlight: true },
     { name: lang === 'hi' ? 'कैलेंडर' : 'Calendar', path: '/farmer/calendar', icon: Calendar },
+    { name: lang === 'hi' ? 'खेत विश्लेषण' : 'Analytics', path: '/farmer/analytics', icon: BarChart3 },
     { name: lang === 'hi' ? 'सहायता केंद्र' : 'Help & Support', path: '/farmer/help', icon: HelpCircle },
     { name: lang === 'hi' ? 'सेटिंग्स' : 'Settings', path: '/farmer/settings', icon: Settings },
   ];
