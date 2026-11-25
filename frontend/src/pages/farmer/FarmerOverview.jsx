@@ -218,17 +218,17 @@ export default function FarmerOverview() {
       {/* ─── ROW 2: NEXT OPERATION (8 COLS) + WEATHER REFERENCE (4 COLS) per §14 ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Next Farming Operation — 8 Columns */}
-        <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-[#E2E8DF] shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-white rounded-3xl p-5 sm:p-6 border border-[#E2E8DF] shadow-sm flex flex-col justify-between min-w-0">
           <div>
-            <div className="flex items-center justify-between pb-3.5 border-b border-[#E2E8DF]">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#84B547] animate-pulse" />
-                <h3 className="text-xs font-extrabold text-[#172D20] uppercase tracking-wider">
-                  {lang === 'hi' ? 'अगला कृषि कार्य (Next Operation)' : 'Next Agricultural Operation'}
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-[#E2E8DF]">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#84B547] animate-pulse shrink-0" />
+                <h3 className="text-xs font-extrabold text-[#172D20] uppercase tracking-wider truncate">
+                  {lang === 'hi' ? 'अगला कृषि कार्य' : 'Next Agricultural Operation'}
                 </h3>
               </div>
               {currentProject && (
-                <span className="text-[11px] font-bold text-[#174D32] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <span className="text-[11px] font-bold text-[#174D32] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 truncate max-w-[200px] shrink-0">
                   {currentProject.name}
                 </span>
               )}
@@ -237,15 +237,17 @@ export default function FarmerOverview() {
             {nextOperation ? (
               <div className="pt-4 space-y-3.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-[11px] font-bold text-[#84B547] uppercase tracking-wider">
-                      Task #{nextOperation.sequence_order} • {nextOperation.stage}
+                      {lang === 'hi' ? `कार्य क्रम #${nextOperation.sequence_order}` : `Task #${nextOperation.sequence_order}`} • {nextOperation.stage}
                     </div>
-                    <h4 className="text-lg sm:text-xl font-black text-[#172D20] mt-0.5">
+                    <h4 className="text-base sm:text-xl font-black text-[#172D20] mt-0.5 break-words">
                       {lang === 'hi' ? nextOperation.operation_name_hi : nextOperation.operation_name_en}
                     </h4>
                   </div>
-                  <StatusBadge status={nextOperation.status} />
+                  <div className="shrink-0">
+                    <StatusBadge status={nextOperation.status} />
+                  </div>
                 </div>
 
                 <p className="text-xs text-[#64748B] leading-relaxed">
@@ -254,21 +256,27 @@ export default function FarmerOverview() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1 text-xs">
                   <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                    <span className="text-[10px] uppercase font-bold text-[#64748B] block">Planned Target</span>
-                    <span className="font-extrabold text-[#172D20] mt-0.5 block">
-                      {nextOperation.planned_start_date || 'Within 7 Days'}
+                    <span className="text-[10px] uppercase font-bold text-[#64748B] block">
+                      {lang === 'hi' ? 'नियोजित तारीख' : 'Planned Target'}
+                    </span>
+                    <span className="font-extrabold text-[#172D20] mt-0.5 block truncate">
+                      {nextOperation.planned_start_date || (lang === 'hi' ? '7 दिन के भीतर' : 'Within 7 Days')}
                     </span>
                   </div>
                   <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                    <span className="text-[10px] uppercase font-bold text-[#64748B] block">Service Needed</span>
+                    <span className="text-[10px] uppercase font-bold text-[#64748B] block">
+                      {lang === 'hi' ? 'आवश्यक सेवा' : 'Service Needed'}
+                    </span>
                     <span className="font-extrabold text-[#174D32] mt-0.5 block truncate">
-                      {nextOperation.service_category_details?.name_en || 'Farm Machinery / Labour'}
+                      {nextOperation.service_category_details?.name_en || (lang === 'hi' ? 'कृषि मशीनरी / श्रमिक' : 'Farm Machinery / Labour')}
                     </span>
                   </div>
                   <div className="p-3 rounded-2xl bg-[#F4F4EE] col-span-2 sm:col-span-1">
-                    <span className="text-[10px] uppercase font-bold text-[#64748B] block">Prerequisite</span>
-                    <span className="font-extrabold text-[#172D20] mt-0.5 block">
-                      {nextOperation.prerequisite_name ? 'Pre-sowing Done' : 'None (Ready)'}
+                    <span className="text-[10px] uppercase font-bold text-[#64748B] block">
+                      {lang === 'hi' ? 'पूर्व शर्त' : 'Prerequisite'}
+                    </span>
+                    <span className="font-extrabold text-[#172D20] mt-0.5 block truncate">
+                      {nextOperation.prerequisite_name ? (lang === 'hi' ? 'पलेवा पूर्ण' : 'Pre-sowing Done') : (lang === 'hi' ? 'कोई नहीं (तैयार)' : 'None (Ready)')}
                     </span>
                   </div>
                 </div>
@@ -370,18 +378,20 @@ export default function FarmerOverview() {
 
           {/* Statutory Policy Disclaimer per §8 */}
           <div className="pt-3 mt-3 border-t border-[#E2E8DF] text-[10px] text-[#64748B] leading-tight">
-            Advisory reference only; platform does not auto-cancel bookings.
+            {lang === 'hi'
+              ? 'सलाहकारी संदर्भ मात्र; मंच बुकिंग स्वतः रद्द नहीं करता।'
+              : 'Advisory reference only; platform does not auto-cancel bookings.'}
           </div>
         </div>
       </div>
 
       {/* ─── ROW 3: SIX RESPONSIVE QUICK-SERVICE CARDS (12 COLS) per §14 ─── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-extrabold uppercase tracking-wider text-[#172D20]">
-            {lang === 'hi' ? 'त्वरित सेवा बुकिंग (Quick Operations Booking)' : 'Six Core Agricultural Services'}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#172D20]">
+            {lang === 'hi' ? 'त्वरित सेवा बुकिंग' : 'Six Core Agricultural Services'}
           </h3>
-          <Link to="/farmer/services" className="text-xs font-bold text-[#174D32] hover:underline flex items-center gap-1">
+          <Link to="/farmer/services" className="text-xs font-bold text-[#174D32] hover:underline flex items-center gap-1 shrink-0">
             <span>{lang === 'hi' ? 'सभी 16+ देखें' : 'View all'}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </Link>
@@ -627,40 +637,52 @@ export default function FarmerOverview() {
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3 text-center">
               <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                <div className="text-[10px] font-bold uppercase text-[#64748B]">Planned Estimates</div>
-                <div className="text-sm font-black text-[#172D20] mt-0.5">
+                <div className="text-[10px] font-bold uppercase text-[#64748B]">
+                  {lang === 'hi' ? 'नियोजित बजट' : 'Planned Estimates'}
+                </div>
+                <div className="text-xs sm:text-sm font-black text-[#172D20] mt-0.5">
                   ₹{Number(finTotals.planned_estimates || 0).toLocaleString()}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                <div className="text-[10px] font-bold uppercase text-[#64748B]">Incurred Costs</div>
-                <div className="text-sm font-black text-[#174D32] mt-0.5">
+                <div className="text-[10px] font-bold uppercase text-[#64748B]">
+                  {lang === 'hi' ? 'वास्तविक खर्च' : 'Incurred Costs'}
+                </div>
+                <div className="text-xs sm:text-sm font-black text-[#174D32] mt-0.5">
                   ₹{Number(finTotals.incurred_expenditure || 0).toLocaleString()}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                <div className="text-[10px] font-bold uppercase text-[#64748B]">Net Payments</div>
-                <div className="text-sm font-black text-emerald-700 mt-0.5">
+                <div className="text-[10px] font-bold uppercase text-[#64748B]">
+                  {lang === 'hi' ? 'कुल भुगतान' : 'Net Payments'}
+                </div>
+                <div className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5">
                   ₹{Number(finTotals.net_recorded_payments || 0).toLocaleString()}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                <div className="text-[10px] font-bold uppercase text-[#64748B]">Outstanding</div>
-                <div className="text-sm font-black text-amber-700 mt-0.5">
+                <div className="text-[10px] font-bold uppercase text-[#64748B]">
+                  {lang === 'hi' ? 'बकाया राशि' : 'Outstanding'}
+                </div>
+                <div className="text-xs sm:text-sm font-black text-amber-700 mt-0.5">
                   ₹{Number(finTotals.outstanding_balance || 0).toLocaleString()}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-[#F4F4EE]">
-                <div className="text-[10px] font-bold uppercase text-[#64748B]">Crop Revenue</div>
-                <div className="text-sm font-black text-[#172D20] mt-0.5">
+                <div className="text-[10px] font-bold uppercase text-[#64748B]">
+                  {lang === 'hi' ? 'फसल बिक्री' : 'Crop Revenue'}
+                </div>
+                <div className="text-xs sm:text-sm font-black text-[#172D20] mt-0.5">
                   ₹{Number(finTotals.realized_revenue || 0).toLocaleString()}
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
-                <div className="text-[10px] font-bold uppercase text-emerald-800">Recorded Surplus</div>
-                <div className="text-sm font-black text-[#174D32] mt-0.5">
+                <div className="text-[10px] font-bold uppercase text-emerald-800">
+                  {lang === 'hi' ? 'दर्ज शुद्ध मुनाफा' : 'Recorded Surplus'}
+                </div>
+                <div className="text-xs sm:text-sm font-black text-[#174D32] mt-0.5">
                   ₹{Number(finTotals.recorded_surplus || 0).toLocaleString()}
                 </div>
               </div>

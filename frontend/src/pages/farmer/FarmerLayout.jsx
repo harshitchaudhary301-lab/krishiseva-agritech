@@ -285,7 +285,7 @@ export default function FarmerLayout() {
         )}
 
         {/* Routed Page Content (§14: Cream background #F4F4EE, Content padding ~24px) */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto pb-24 md:pb-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto pb-24 md:pb-8 min-w-0 overflow-x-hidden">
           <Outlet />
         </main>
 
@@ -298,7 +298,7 @@ export default function FarmerLayout() {
             }
           >
             <LayoutDashboard className="w-5 h-5 mb-0.5" />
-            <span>Home</span>
+            <span>{lang === 'hi' ? 'होम' : 'Home'}</span>
           </NavLink>
           <NavLink
             to="/farmer/services"
@@ -307,7 +307,7 @@ export default function FarmerLayout() {
             }
           >
             <Search className="w-5 h-5 mb-0.5" />
-            <span>Services</span>
+            <span>{lang === 'hi' ? 'सेवाएं' : 'Services'}</span>
           </NavLink>
           <NavLink
             to="/farmer/projects"
@@ -316,7 +316,7 @@ export default function FarmerLayout() {
             }
           >
             <FolderKanban className="w-5 h-5 mb-0.5 text-[#E8B44C]" />
-            <span>Projects</span>
+            <span>{lang === 'hi' ? 'प्रोजेक्ट्स' : 'Projects'}</span>
           </NavLink>
           <NavLink
             to="/farmer/analytics"
@@ -325,7 +325,7 @@ export default function FarmerLayout() {
             }
           >
             <BarChart3 className="w-5 h-5 mb-0.5" />
-            <span>Finance</span>
+            <span>{lang === 'hi' ? 'हिसाब' : 'Finance'}</span>
           </NavLink>
           <NavLink
             to="/farmer/settings"
@@ -334,7 +334,7 @@ export default function FarmerLayout() {
             }
           >
             <User className="w-5 h-5 mb-0.5" />
-            <span>Profile</span>
+            <span>{lang === 'hi' ? 'प्रोफ़ाइल' : 'Profile'}</span>
           </NavLink>
         </nav>
       </div>

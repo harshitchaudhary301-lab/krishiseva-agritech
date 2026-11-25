@@ -529,3 +529,100 @@ Upon approval, Stage 02 will implement:
 | Hero image file size (~875KB desktop, ~811KB mobile) | Low | Exceeds target <400KB. Can be optimized with compression tools if available. Quality preserved per §5 guidelines. |
 | Remaining landing page sections are placeholder anchors | Expected | Will be implemented in Stage 02 after Gate A approval |
 
+
+
+---
+
+## 11. PART 04: STAGE 02 & STAGE 03 EXECUTION (KS-FDC-04)
+
+**Task ID:** KS-FDC-04-FINAL  
+**Branch:** `mission03-mvp`  
+**Execution Mode:** Controlled, Reference-Locked Implementation  
+**Status:** **STAGE 02 & STAGE 03 COMPLETE — AWAITING DASHBOARD APPROVAL (GATE B)**
+
+---
+
+### 11.1 Stage 02 — Complete Landing Page (§12) & Authentication (§13)
+
+Implemented complete 9-section landing page extending the approved cinematic hero visual identity:
+
+1. **Hero & Capability Strip:**
+   - Cinematic tractor visual, floating obsidian nav, bilingual headline, harvest-yellow CTAs, capability strip (Farm Planning, Service Discovery, Expense Management, Agricultural Records).
+2. **Everything Your Farm Needs (§12):**
+   - Actual service catalogue categories connected to `/api/services/categories/`.
+   - Category cards with typical rates, icons, active status badges, and request links.
+   - Specific geographic scope note: *"Direct Matching: Meerut Rural & Western UP • Nationwide catalog"*.
+3. **Your Digital Farm Manager (§12):**
+   - Interactive demonstration preview based on Wheat Harvesting 2026 (20 Acres).
+   - Explicitly badged as `"Demonstration Preview (Safe Synthetic Records)"` per §12 privacy requirements.
+   - Shows progress (65%), synchronized operations (harvester, labour, mechanic inspection), and budget breakdown.
+4. **Connected Ecosystem (§12):**
+   - Asymmetric bento-grid layout highlighting Farm Project Manager as the central core feature.
+   - 12 modules grouped into Agricultural Foundation, Operational Execution, and Post-Harvest & Governance.
+5. **How KrishiSeva Works (§12):**
+   - 4-step flow: 1. Create Farm → 2. Plan Crop → 3. Find Services → 4. Manage Operations & Expenses.
+6. **Farmer and Provider Onboarding (§12):**
+   - Clear value propositions for Farmers (no double booking, transparent quotes, backup provider) and Providers/Workers (fair wages, direct notifications, verified badge).
+7. **Trust and FAQ (§12):**
+   - Authoritative answers on double-booking prevention, backup providers, transparent pricing, and multiple farm parcels.
+8. **Premium Final CTA (§12):**
+   - Forest-green surface (#174D32) with headline *"A Better Way to Manage Your Farm."* and harvest-yellow CTA to `/register`.
+9. **Footer (§12):**
+   - Obsidian surface (#101510), working links, active services, platform navigation, portal access, and copyright.
+
+**Authentication Interfaces (§13):**
+- `LoginPage.jsx` and `RegisterPage.jsx` styled to approved design system (`#101510`, `#174D32`, `#FCE052`, `#F4F4EE`).
+- Preserved existing authentication logic: adult confirmation, terms consent, LGD nationwide location selector, role-based conditional fields, and password recovery modal flow.
+
+---
+
+### 11.2 Stage 03 — Farmer Dashboard ("MY FARM, MY DAY") (§14–§18)
+
+Implemented the locked layout matching §14 specifications:
+
+**Desktop Layout (1440 × 900):**
+- **Sidebar:** Width ~248px (`w-[248px]`), dark obsidian (`#101510`), border-r `border-white/10`.
+  - Links: Home (`/farmer/overview`), Services (`/farmer/services`), Projects (`/farmer/projects`), Finance (`/farmer/analytics`), My Farm (`/farmer/farms`), More Tools (`/farmer/calendar`, `/farmer/help`), Profile (`/farmer/settings`).
+  - Includes user snapshot, demo switch button, and logout button.
+- **Header:** Height ~64px (`h-16`), white surface, sticky top, with farm/village indicator, bilingual language toggle, and notification dropdown.
+- **Main Content:** Cream background (`#F4F4EE`), padding ~24px, 12-column responsive grid with 20px gap.
+
+**12-Column Grid Distribution (§14):**
+- **Row 1 (12 cols):** Farm overview banner (`Ganga Khet — Daurala`, LGD code, acreage, active crops, "+ New Service Request" & "+ Plan Crop Project" actions).
+- **Row 2 (8 cols + 4 cols):**
+  - Col 8: Next farming operation card (`#3 Seed Bed Preparation`, target dates, service needed, prerequisite status).
+  - Col 4: Advisory weather card (live/benchmark temperature, humidity, wind, rainfall, advisory disclaimer).
+- **Row 3 (12 cols):** Six responsive quick-service cards (Combine Harvester, Tractor Repair, Agricultural Labour, Tubewell Repair, Land Preparation, Crop Protection).
+- **Row 4 (6 cols + 6 cols):**
+  - Col 6: Active farm projects (Wheat Harvesting 2026, progress bar, acreage, operations count).
+  - Col 6: Upcoming bookings & schedule (confirmed bookings, agreed amounts, provider name, dates).
+- **Row 5 (6 cols + 6 cols):**
+  - Col 6: Authoritative financial ledger FIN-01 to FIN-12 (planned estimates, confirmed commitments, incurred costs, net payments, outstanding balance, realized revenue, recorded surplus).
+  - Col 6: Service requests & quotations (recent requests with quotation status and backup provider availability).
+
+**Mobile Layout (390 × 844) (§14):**
+- Compact header with farm indicator and hamburger menu.
+- Stacked cards with safe-area spacing and horizontal overflow protection (`overflow-x-hidden`).
+- Fixed 5-item bottom navigation: `Home | Services | Projects | Finance | Profile` (localized in Hindi as `होम | सेवाएं | प्रोजेक्ट्स | हिसाब | प्रोफ़ाइल`).
+
+**First-Time User States (§18):**
+- No farm: *"Add Your First Farm"* card with register action.
+- Farm exists but no project: *"Create Your First Crop Plan"* card.
+- Live data integration: User details, farms, projects, operations, services, bookings, weather, finance, and notifications all connected via existing shared API client (`/api/...`).
+
+---
+
+### 11.3 Developer Check Results
+
+| Check | Command | Outcome | Status |
+|---|---|---|---|
+| Django System Check | `python backend/manage.py check` | System check identified no issues (0 silenced) | **PASSED** |
+| Automated Backend Tests | `python backend/manage.py test accounts bookings services farm_projects` | Ran 48 tests in 86.663s. OK. (0 errors, 0 failures) | **PASSED** |
+| Frontend Production Build | `npm --prefix frontend run build` | ✓ built in 1.03s (2,236 modules transformed, 0 errors) | **PASSED** |
+
+---
+
+### 11.4 Local Commits
+
+- **Stage 00+01 (Gate A):** `b2eba90` — *feat(ui): cinematic hero landing page, design system update, remove automatic data defaults*
+- **Stage 02+03 (Gate B):** `6fd3601` — *feat(ui): complete 9-section landing page, styled auth interfaces, and reference-locked farmer dashboard*
