@@ -4,12 +4,21 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from .models import User, WorkerProfile, ProviderProfile, VerificationAuditLog
 from .serializers import (
     RegisterSerializer, UserSerializer,
-    AdminVerificationActionSerializer, VerificationAuditLogSerializer
+    AdminVerificationActionSerializer, VerificationAuditLogSerializer,
+    PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    ChangePasswordSerializer
 )
 from .permissions import IsAdminRole
 
@@ -130,10 +139,153 @@ class LogoutView(APIView):
 
     def post(self, request):
         try:
-            request.user.auth_token.delete()
+            Token.objects.filter(user=request.user).delete()
         except Exception:
             pass
         return Response({'message': 'Logged out successfully'})
+
+
+class RevokeTokenView(APIView):
+    """
+    Explicitly revokes all active authentication tokens for the requesting user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response({'message': 'Authentication credentials revoked successfully.'}, status=status.HTTP_200_OK)
+
+
+class PasswordResetRequestView(APIView):
+    """
+    Initiates password recovery by sending a reset token via isolated local delivery.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        identifier = serializer.validated_data['email'].strip()
+        user = None
+        if '@' in identifier:
+            user = User.objects.filter(email__iexact=identifier).first()
+        if not user:
+            user = User.objects.filter(username__iexact=identifier).first()
+
+        if not user:
+            return Response({
+                'message': 'If a matching account exists, password recovery instructions have been sent.'
+            }, status=status.HTTP_200_OK)
+
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+        subject = "KrishiSeva Password Recovery Request"
+        message = (
+            f"Hello {user.get_full_name() or user.username},\n\n"
+            f"A password reset request was received for your KrishiSeva account.\n"
+            f"Your Password Reset Token: {token}\n"
+            f"Your User Identifier (UID): {uid}\n\n"
+            f"If you did not make this request, you can safely ignore this email.\n"
+        )
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'support@krishiseva.in'),
+            recipient_list=[user.email] if user.email else ['dev@krishiseva.local'],
+            fail_silently=True,
+        )
+
+        resp_data = {
+            'message': 'Password recovery instructions have been sent to your registered contact.',
+        }
+        if settings.DEBUG or getattr(settings, 'IS_RENDER', False) is False:
+            resp_data['dev_uid'] = uid
+            resp_data['dev_token'] = token
+
+        return Response(resp_data, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(APIView):
+    """
+    Validates token and updates user password, revoking any old sessions.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        uidb64 = serializer.validated_data['uid']
+        token = serializer.validated_data['token']
+        new_password = serializer.validated_data['new_password']
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({'error': 'Invalid password reset link or user identifier.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({'error': 'Invalid or expired password reset token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as err:
+            return Response({'error': err.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        # Invalidate old credentials and issue fresh token
+        Token.objects.filter(user=user).delete()
+        fresh_token = Token.objects.create(user=user)
+
+        return Response({
+            'message': 'Password has been reset successfully. You are now logged in.',
+            'token': fresh_token.key,
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    """
+    Authenticated password change endpoint that validates current password,
+    enforces password rules, and revokes prior tokens upon change.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        old_password = serializer.validated_data['old_password']
+        new_password = serializer.validated_data['new_password']
+
+        if not user.check_password(old_password):
+            return Response({'old_password': ['Current password is incorrect.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as err:
+            return Response({'new_password': err.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        # Revoke old tokens and issue fresh token
+        Token.objects.filter(user=user).delete()
+        fresh_token = Token.objects.create(user=user)
+
+        return Response({
+            'message': 'Password changed successfully. Prior credentials revoked.',
+            'token': fresh_token.key
+        }, status=status.HTTP_200_OK)
 
 
 class AdminVerificationView(APIView):

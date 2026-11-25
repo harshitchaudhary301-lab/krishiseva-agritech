@@ -117,6 +117,7 @@ class UserConsent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consents')
     terms_accepted = models.BooleanField(default=True)
     privacy_accepted = models.BooleanField(default=True)
+    is_adult_confirmed = models.BooleanField(default=True, help_text="Explicit confirmation that registrant is 18 years of age or older.")
     terms_version = models.CharField(max_length=20, default='v1.0')
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)

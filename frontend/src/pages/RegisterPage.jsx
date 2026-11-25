@@ -31,7 +31,9 @@ export default function RegisterPage() {
     service_categories: 'tractor_mechanic',
     service_villages: 'Daurala, Sardhana, Mawana',
     qualifications: 'ITI Diesel Mechanic Certified',
-    machinery_details: 'Mobile diagnostic & repair unit'
+    machinery_details: 'Mobile diagnostic & repair unit',
+    confirm_adult: true,
+    consent_terms: true
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -51,6 +53,16 @@ export default function RegisterPage() {
       return;
     }
 
+    if ((role === 'worker' || role === 'provider') && !formData.confirm_adult) {
+      setError(lang === 'hi' ? 'वयस्क घोषणा आवश्यक: श्रमिक एवं सेवा प्रदाता की आयु 18 वर्ष या उससे अधिक होनी चाहिए।' : 'Adult declaration required: Agricultural workers and service providers must confirm they are at least 18 years of age.');
+      return;
+    }
+
+    if (!formData.consent_terms) {
+      setError(lang === 'hi' ? 'कृपया सेवा की शर्तें और गोपनीयता नीति स्वीकार करें।' : 'Please accept the Terms of Service & Privacy Policy to proceed.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -58,6 +70,9 @@ export default function RegisterPage() {
       const payload = {
         role,
         ...formData,
+        confirm_adult: Boolean(formData.confirm_adult),
+        consent_terms: Boolean(formData.consent_terms),
+        consent_privacy: Boolean(formData.consent_terms),
         land_acres: parseFloat(formData.land_acres || 0),
         daily_wage_rate: parseFloat(formData.daily_wage_rate || 500)
       };
@@ -398,6 +413,37 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
+
+            {/* Legal & Age Consent Declarations */}
+            <div className="pt-3 pb-1 space-y-2.5 text-xs text-slate-700">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.confirm_adult}
+                  onChange={(e) => setFormData({ ...formData, confirm_adult: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded text-[#174D32] focus:ring-[#84B547] border-slate-300"
+                />
+                <span>
+                  {lang === 'hi'
+                    ? 'मैं पुष्टि करता हूँ कि मेरी आयु 18 वर्ष या उससे अधिक है (श्रमिकों एवं सेवा प्रदाताओं के लिए अनिवार्य)।'
+                    : 'I confirm that I am 18 years of age or older (Adult declaration required for agricultural workers & providers).'}
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.consent_terms}
+                  onChange={(e) => setFormData({ ...formData, consent_terms: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded text-[#174D32] focus:ring-[#84B547] border-slate-300"
+                />
+                <span>
+                  {lang === 'hi'
+                    ? 'मैं कृषि सेवा के नियम, शर्तें और गोपनीयता नीति (Terms of Service & Privacy Policy) स्वीकार करता हूँ।'
+                    : 'I agree to the KrishiSeva Terms of Service & Privacy Policy.'}
+                </span>
+              </label>
+            </div>
 
             <button
               type="submit"

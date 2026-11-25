@@ -33,6 +33,7 @@ class UserSerializer(serializers.ModelSerializer):
     worker_profile = WorkerProfileSerializer(read_only=True)
     provider_profile = ProviderProfileSerializer(read_only=True)
     verification_status = serializers.SerializerMethodField()
+    preferred_language = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -41,9 +42,17 @@ class UserSerializer(serializers.ModelSerializer):
             'role', 'phone', 'state', 'district', 'village',
             'profile_complete', 'date_joined',
             'farmer_profile', 'worker_profile', 'provider_profile',
-            'verification_status'
+            'verification_status', 'preferred_language'
         ]
         read_only_fields = ['id', 'role', 'date_joined']
+
+    def get_preferred_language(self, obj):
+        try:
+            if hasattr(obj, 'farmer_profile') and obj.farmer_profile:
+                return obj.farmer_profile.preferred_language
+        except Exception:
+            pass
+        return 'hi'
 
     def get_verification_status(self, obj):
         try:
@@ -60,7 +69,8 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
-    # Consent fields
+    # Consent & Adult declaration fields
+    confirm_adult = serializers.BooleanField(write_only=True, required=False, default=True)
     consent_terms = serializers.BooleanField(write_only=True, required=False, default=True)
     consent_privacy = serializers.BooleanField(write_only=True, required=False, default=True)
     terms_version = serializers.CharField(write_only=True, required=False, default='v1.0')
@@ -81,7 +91,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'name', 'role',
             'phone', 'state', 'district', 'village',
-            'consent_terms', 'consent_privacy', 'terms_version',
+            'confirm_adult', 'consent_terms', 'consent_privacy', 'terms_version',
             'land_acres', 'primary_crops', 'skills', 'daily_wage_rate',
             'business_name', 'service_categories', 'service_villages',
             'qualifications', 'machinery_details'
@@ -92,12 +102,25 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid registration role. Public registration for administrative roles is prohibited.")
         return value
 
+    def validate(self, attrs):
+        role = attrs.get('role', 'farmer')
+        confirm_adult = attrs.get('confirm_adult', True)
+        if role in ['worker', 'provider'] and not confirm_adult:
+            raise serializers.ValidationError({
+                'confirm_adult': 'Adult registration declaration is required: Agricultural workers and service providers must confirm they are at least 18 years of age.'
+            })
+        return attrs
+
     def create(self, validated_data):
         name = validated_data.pop('name', '')
         password = validated_data.pop('password')
         role = validated_data.get('role', 'farmer')
 
-        # Pop consent fields
+        # Pop consent & adult confirmation fields
+        confirm_adult = validated_data.pop('confirm_adult', True)
+        consent_terms = validated_data.pop('consent_terms', True)
+        consent_privacy = validated_data.pop('consent_privacy', True)
+        terms_version = validated_data.pop('terms_version', 'v1.0')
         consent_terms = validated_data.pop('consent_terms', True)
         consent_privacy = validated_data.pop('consent_privacy', True)
         terms_version = validated_data.pop('terms_version', 'v1.0')
@@ -138,6 +161,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             user=user,
             terms_accepted=consent_terms,
             privacy_accepted=consent_privacy,
+            is_adult_confirmed=confirm_adult,
             terms_version=terms_version
         )
 
@@ -191,4 +215,19 @@ class VerificationAuditLogSerializer(serializers.ModelSerializer):
             'action', 'previous_status', 'new_status', 'reason', 'timestamp',
             'subject_user_name', 'subject_user', 'created_at', 'reviewed_by_name', 'notes'
         ]
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.CharField(required=True)
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField(required=True)
+    token = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=6)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=6)
 

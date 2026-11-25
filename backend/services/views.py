@@ -571,6 +571,8 @@ class ProviderCoverageAreaListCreateView(APIView):
         user = request.user
         if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
             return Response({'error': 'Only providers or workers can configure coverage areas.'}, status=status.HTTP_403_FORBIDDEN)
+        if (hasattr(user, 'provider_profile') and user.provider_profile.is_suspended()) or (hasattr(user, 'worker_profile') and user.worker_profile.is_suspended()):
+            return Response({'error': 'Suspended accounts cannot modify coverage areas.'}, status=status.HTTP_403_FORBIDDEN)
 
         coverage_level = request.data.get('coverage_level', 'village')
         state_id = request.data.get('state_id')
@@ -640,6 +642,8 @@ class ProviderResourceListCreateView(APIView):
         user = request.user
         if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
             return Response({'error': 'Only providers or workers can configure resources.'}, status=status.HTTP_403_FORBIDDEN)
+        if (hasattr(user, 'provider_profile') and user.provider_profile.is_suspended()) or (hasattr(user, 'worker_profile') and user.worker_profile.is_suspended()):
+            return Response({'error': 'Suspended accounts cannot register resources.'}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ProviderResourceSerializer(data=request.data)
         if serializer.is_valid():
@@ -679,6 +683,8 @@ class ProviderAvailabilityWindowListCreateView(APIView):
         user = request.user
         if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
             return Response({'error': 'Only providers or workers can configure availability windows.'}, status=status.HTTP_403_FORBIDDEN)
+        if (hasattr(user, 'provider_profile') and user.provider_profile.is_suspended()) or (hasattr(user, 'worker_profile') and user.worker_profile.is_suspended()):
+            return Response({'error': 'Suspended accounts cannot configure availability windows.'}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ProviderAvailabilityWindowSerializer(data=request.data)
         if serializer.is_valid():
@@ -708,6 +714,10 @@ class ProviderServiceManageView(APIView):
 
     def post(self, request):
         user = request.user
+        if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
+            return Response({'error': 'Only providers or workers can configure services.'}, status=status.HTTP_403_FORBIDDEN)
+        if (hasattr(user, 'provider_profile') and user.provider_profile.is_suspended()) or (hasattr(user, 'worker_profile') and user.worker_profile.is_suspended()):
+            return Response({'error': 'Suspended accounts cannot manage service offerings.'}, status=status.HTTP_403_FORBIDDEN)
         category_id = request.data.get('category_id') or request.data.get('category')
         category = get_object_or_404(ServiceCategory, pk=category_id)
 

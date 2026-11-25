@@ -189,7 +189,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # -----------------------------------------------------------------------------
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'accounts.authentication.ExpiringTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -198,6 +198,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
 }
+
+# -----------------------------------------------------------------------------
+# Email Configuration (Isolated Local Delivery for Password Recovery)
+# -----------------------------------------------------------------------------
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = 'support@krishiseva.in'
+TOKEN_EXPIRE_DAYS = int(os.environ.get('TOKEN_EXPIRE_DAYS', '30'))
 
 # -----------------------------------------------------------------------------
 # CORS & CSRF Configuration
