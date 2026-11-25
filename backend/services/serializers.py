@@ -192,6 +192,7 @@ class InstitutionalResourceSerializer(serializers.ModelSerializer):
             'id', 'name_en', 'name_hi', 'category', 'category_display',
             'description_en', 'description_hi', 'official_url',
             'geographic_coverage', 'implementing_agency', 'contact_info',
-            'is_verified', 'last_reviewed_date', 'display_order', 'created_at'
+            'is_verified', 'verification_status', 'source_publication_date',
+            'last_reviewed_date', 'display_order', 'created_at'
         ]
 

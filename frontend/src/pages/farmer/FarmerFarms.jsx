@@ -18,6 +18,8 @@ export default function FarmerFarms() {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSoilModal, setShowSoilModal] = useState(false);
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [selectedFarmForField, setSelectedFarmForField] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -32,13 +34,28 @@ export default function FarmerFarms() {
     land_tenure: 'owned',
     khasra_number: '',
     size_acres: '10',
+    original_area_unit: 'acre',
     current_crops: 'Wheat, Sugarcane',
     soil_type: 'Alluvial Loam',
-    irrigation_source: 'Tubewell + Canal Channel'
+    irrigation_source: 'Tubewell + Canal Channel',
+    history_notes: ''
+  });
+
+  const [fieldFormData, setFieldFormData] = useState({
+    name: '',
+    khasra_number: '',
+    area_acres: '5.0',
+    original_area_value: '',
+    original_area_unit: 'acre',
+    land_tenure: 'owned',
+    soil_type: 'Alluvial Loam',
+    irrigation_status: 'Tubewell Irrigated',
+    history_notes: ''
   });
 
   const [soilData, setSoilData] = useState({
     farm: '',
+    field: '',
     sampling_date: new Date().toISOString().split('T')[0],
     lab_name: 'Meerut Soil Testing Laboratory (KVK)',
     sample_id: 'STL-2026-089',
@@ -105,45 +122,99 @@ export default function FarmerFarms() {
         land_tenure: 'owned',
         khasra_number: '',
         size_acres: '10',
+        original_area_unit: 'acre',
         current_crops: 'Wheat, Sugarcane',
         soil_type: 'Alluvial Loam',
-        irrigation_source: 'Tubewell + Canal Channel'
+        irrigation_source: 'Tubewell + Canal Channel',
+        history_notes: ''
       });
       fetchFarms();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || 'Failed to save farm.');
+      setError(err.response?.data?.error || err.response?.data?.size_acres?.[0] || 'Failed to save farm.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleFieldSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedFarmForField) return;
+    if (!fieldFormData.name || !fieldFormData.area_acres) {
+      alert(lang === 'hi' ? 'कृपया नाम और रकबा दर्ज करें।' : 'Please enter field name and area.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post(`/farm-projects/farms/${selectedFarmForField.id}/fields/`, {
+        ...fieldFormData,
+        area_acres: parseFloat(fieldFormData.area_acres),
+        original_area_value: fieldFormData.original_area_value ? parseFloat(fieldFormData.original_area_value) : null
+      });
+      setShowAddFieldModal(false);
+      setFieldFormData({
+        name: '',
+        khasra_number: '',
+        area_acres: '5.0',
+        original_area_value: '',
+        original_area_unit: 'acre',
+        land_tenure: 'owned',
+        soil_type: 'Alluvial Loam',
+        irrigation_status: 'Tubewell Irrigated',
+        history_notes: ''
+      });
+      setSuccess(lang === 'hi' ? 'खेत का नया रकबा (Field) सफलतापूर्वक जोड़ा गया।' : 'Field parcel added successfully.');
+      fetchFarms();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || err.response?.data?.area_acres?.[0] || 'Failed to add field parcel.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteField = async (fieldId) => {
+    if (!window.confirm(lang === 'hi' ? 'क्या आप इस हिस्से (Field) को हटाना चाहते हैं?' : 'Are you sure you want to delete this field parcel?')) return;
+    try {
+      await api.delete(`/farm-projects/fields/${fieldId}/`);
+      fetchFarms();
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleSoilSubmit = async (e) => {
     e.preventDefault();
     if (!soilData.farm) {
-      alert('Please select a farm plot.');
+      alert(lang === 'hi' ? 'कृपया संबंधित खेत चुनें।' : 'Please select a farm plot.');
       return;
     }
     setSubmitting(true);
     try {
-      await api.post('/farm-projects/soil-reports/', {
-        ...soilData,
+      const payload = {
         farm: parseInt(soilData.farm, 10),
+        field: soilData.field ? parseInt(soilData.field, 10) : null,
+        sampling_date: soilData.sampling_date,
+        lab_name: soilData.lab_name,
+        sample_id: soilData.sample_id,
+        soil_texture: soilData.soil_texture,
         ph: parseFloat(soilData.ph),
-        electrical_conductivity: parseFloat(soilData.electrical_conductivity),
-        organic_carbon_percentage: parseFloat(soilData.organic_carbon_percentage),
-        nitrogen_kg_per_ha: parseFloat(soilData.nitrogen_kg_per_ha),
-        phosphorus_kg_per_ha: parseFloat(soilData.phosphorus_kg_per_ha),
-        potassium_kg_per_ha: parseFloat(soilData.potassium_kg_per_ha),
-        zinc_ppm: parseFloat(soilData.zinc_ppm),
-        iron_ppm: parseFloat(soilData.iron_ppm)
-      });
+        ec: parseFloat(soilData.electrical_conductivity || 0),
+        organic_carbon_percent: parseFloat(soilData.organic_carbon_percentage || 0),
+        nitrogen_kg_ha: parseFloat(soilData.nitrogen_kg_per_ha || 0),
+        phosphorus_kg_ha: parseFloat(soilData.phosphorus_kg_per_ha || 0),
+        potassium_kg_ha: parseFloat(soilData.potassium_kg_per_ha || 0),
+        zinc_ppm: parseFloat(soilData.zinc_ppm || 0),
+        iron_ppm: parseFloat(soilData.iron_ppm || 0)
+      };
+      await api.post('/farm-projects/soil-reports/', payload);
       setShowSoilModal(false);
       setSuccess(lang === 'hi' ? 'मृदा परीक्षण रिपोर्ट सफलतापूर्वक दर्ज की गई।' : 'Soil test report registered successfully.');
       fetchFarms();
     } catch (err) {
       console.error(err);
-      alert('Failed to save soil test report.');
+      alert(err.response?.data?.error || 'Failed to save soil test report.');
     } finally {
       setSubmitting(false);
     }
@@ -275,19 +346,36 @@ export default function FarmerFarms() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      {lang === 'hi' ? 'कुल रकबा (एकड़) *' : 'Land Size (Acres) *'}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={formData.size_acres}
-                      onChange={(e) => setFormData({ ...formData, size_acres: e.target.value })}
-                      placeholder="10"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                      required
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        {lang === 'hi' ? 'कुल रकबा (एकड़) *' : 'Land Size (Acres) *'}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={formData.size_acres}
+                        onChange={(e) => setFormData({ ...formData, size_acres: e.target.value })}
+                        placeholder="10"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        {lang === 'hi' ? 'मापन इकाई' : 'Area Unit'}
+                      </label>
+                      <select
+                        value={formData.original_area_unit || 'acre'}
+                        onChange={(e) => setFormData({ ...formData, original_area_unit: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                      >
+                        <option value="acre">Acres (एकड़)</option>
+                        <option value="bigha">Bigha (बीघा)</option>
+                        <option value="hectare">Hectare (हेक्टेयर)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -392,6 +480,19 @@ export default function FarmerFarms() {
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'खेत का इतिहास व टिप्पणी' : 'Farm History & Management Notes'}
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={formData.history_notes}
+                    onChange={(e) => setFormData({ ...formData, history_notes: e.target.value })}
+                    placeholder={lang === 'hi' ? 'फसल चक्र इतिहास, हरी खाद, या विशेष विशेषताएं...' : 'Crop rotation history, green manuring, or soil observations...'}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -499,6 +600,60 @@ export default function FarmerFarms() {
                         </div>
                       )}
                     </div>
+
+                    {/* Field Parcels (Sub-plots) */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-[#174D32]" />
+                          <span>{lang === 'hi' ? 'खेत के हिस्से (Parcels)' : 'Field Parcels'}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-bold">
+                            {farm.fields?.length || 0}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFarmForField(farm);
+                            setShowAddFieldModal(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#174D32] hover:text-[#0e3321] transition cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>{lang === 'hi' ? 'हिस्सा जोड़ें' : '+ Add Parcel'}</span>
+                        </button>
+                      </div>
+
+                      {farm.fields && farm.fields.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {farm.fields.map((fld) => (
+                            <div key={fld.id} className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-[11px]">
+                              <div>
+                                <span className="font-bold text-slate-800">{fld.name}</span>
+                                {fld.khasra_number && (
+                                  <span className="text-[10px] text-slate-400 font-mono ml-1.5">(Khasra: {fld.khasra_number})</span>
+                                )}
+                                <div className="text-[10px] text-slate-500">
+                                  {fld.area_acres} Acres · {fld.irrigation_status || 'Irrigated'}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteField(fld.id)}
+                                className="text-slate-400 hover:text-red-500 p-1 rounded-md transition"
+                                title="Delete field"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 italic py-1">
+                          {lang === 'hi' ? 'कोई अलग पार्सल दर्ज नहीं है (पूरा रकबा एकसाथ)।' : 'No separate parcels registered (whole farm unit).'}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
@@ -560,7 +715,7 @@ export default function FarmerFarms() {
                         Sample ID: {report.sample_id || `SOIL-${report.id}`}
                       </span>
                       <h4 className="font-bold text-base text-slate-900 mt-0.5">
-                        {report.farm_name || 'Farm Plot'}
+                        {report.farm_name || 'Farm Plot'}{report.field_name ? ` • Plot: ${report.field_name}` : ''}
                       </h4>
                       <p className="text-xs text-slate-500">
                         Tested at: <strong>{report.lab_name}</strong> • Date: {report.sampling_date}
@@ -630,6 +785,146 @@ export default function FarmerFarms() {
         </div>
       )}
 
+      {/* Modal: Add Field Parcel */}
+      {showAddFieldModal && selectedFarmForField && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-5 bg-[#174D32] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold">
+                  {lang === 'hi' ? 'खेत का हिस्सा (Parcel) जोड़ें' : 'Add Field Parcel'}
+                </h3>
+                <p className="text-xs text-emerald-100">
+                  {selectedFarmForField.name} ({selectedFarmForField.village})
+                </p>
+              </div>
+              <button onClick={() => setShowAddFieldModal(false)} className="p-1.5 text-white/80 hover:text-white rounded-lg">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleFieldSubmit} className="p-5 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'हिस्से / पार्सल का नाम *' : 'Parcel / Field Name *'}
+                </label>
+                <input
+                  type="text"
+                  value={fieldFormData.name}
+                  onChange={(e) => setFieldFormData({ ...fieldFormData, name: e.target.value })}
+                  placeholder="उदा: ट्यूबवेल वाला खेत / उत्तरी भाग"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'मानकीकृत रकबा (एकड़) *' : 'Standard Area (Acres) *'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={fieldFormData.area_acres}
+                    onChange={(e) => setFieldFormData({ ...fieldFormData, area_acres: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'खसरा / सर्वे सं.' : 'Khasra Number'}
+                  </label>
+                  <input
+                    type="text"
+                    value={fieldFormData.khasra_number}
+                    onChange={(e) => setFieldFormData({ ...fieldFormData, khasra_number: e.target.value })}
+                    placeholder="342/2"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'मापन इकाई' : 'Original Unit'}
+                  </label>
+                  <select
+                    value={fieldFormData.original_area_unit || 'acre'}
+                    onChange={(e) => setFieldFormData({ ...fieldFormData, original_area_unit: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  >
+                    <option value="acre">Acres (एकड़)</option>
+                    <option value="bigha">Bigha (बीघा)</option>
+                    <option value="hectare">Hectare (हेक्टेयर)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'स्वामित्व स्थिति' : 'Land Tenure'}
+                  </label>
+                  <select
+                    value={fieldFormData.land_tenure || 'owned'}
+                    onChange={(e) => setFieldFormData({ ...fieldFormData, land_tenure: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  >
+                    <option value="owned">Owned (निजी)</option>
+                    <option value="leased">Leased (पट्टे पर)</option>
+                    <option value="sharecropped">Sharecropped (बटाई)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'सिंचाई स्थिति' : 'Irrigation Status'}
+                  </label>
+                  <input
+                    type="text"
+                    value={fieldFormData.irrigation_status}
+                    onChange={(e) => setFieldFormData({ ...fieldFormData, irrigation_status: e.target.value })}
+                    placeholder="Tubewell Irrigated"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'मिट्टी प्रकार' : 'Soil Type'}
+                  </label>
+                  <input
+                    type="text"
+                    value={fieldFormData.soil_type}
+                    onChange={(e) => setFieldFormData({ ...fieldFormData, soil_type: e.target.value })}
+                    placeholder="Alluvial Loam"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddFieldModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700"
+                >
+                  {lang === 'hi' ? 'रद्द करें' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition disabled:opacity-50"
+                >
+                  {submitting ? '...' : (lang === 'hi' ? 'हिस्सा सहेजें' : 'Save Field')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Modal: Add Soil Report */}
       {showSoilModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -655,7 +950,7 @@ export default function FarmerFarms() {
                 </label>
                 <select
                   value={soilData.farm}
-                  onChange={(e) => setSoilData({ ...soilData, farm: e.target.value })}
+                  onChange={(e) => setSoilData({ ...soilData, farm: e.target.value, field: '' })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
                   required
                 >
@@ -667,6 +962,26 @@ export default function FarmerFarms() {
                   ))}
                 </select>
               </div>
+
+              {soilData.farm && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'खेत का हिस्सा / पार्सल (वैकल्पिक)' : 'Specific Field Parcel (Optional)'}
+                  </label>
+                  <select
+                    value={soilData.field || ''}
+                    onChange={(e) => setSoilData({ ...soilData, field: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  >
+                    <option value="">-- {lang === 'hi' ? 'पूरे खेत का सामान्य सैंपल' : 'Entire Farm / General Plot'} --</option>
+                    {(farms.find(f => String(f.id) === String(soilData.farm))?.fields || []).map((fld) => (
+                      <option key={fld.id} value={fld.id}>
+                        {fld.name} ({fld.area_acres} Acres{fld.khasra_number ? `, Khasra: ${fld.khasra_number}` : ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

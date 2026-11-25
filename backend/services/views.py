@@ -518,24 +518,47 @@ class AgriculturalReferenceRecordListView(generics.ListAPIView):
         return qs
 
 
-class InstitutionalResourceListView(generics.ListAPIView):
+class InstitutionalResourceListView(generics.ListCreateAPIView):
     """
     Module 12: Government & Institutional Connect
     Read-only public directory of official government schemes, KVKs, ICAR research centers, and portals.
+    Authorized admin users can add and maintain official entries.
     """
-    permission_classes = [permissions.AllowAny]
     serializer_class = InstitutionalResourceSerializer
     pagination_class = None
 
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        from accounts.permissions import IsAdminRole
+        return [permissions.IsAuthenticated(), IsAdminRole()]
+
     def get_queryset(self):
-        qs = InstitutionalResource.objects.filter(is_verified=True)
+        qs = InstitutionalResource.objects.all()
+        if not (self.request.user.is_authenticated and hasattr(self.request.user, 'is_admin_role') and (self.request.user.is_admin_role() or self.request.user.is_superuser)):
+            qs = qs.filter(is_verified=True)
+
         category = self.request.query_params.get('category')
         search = self.request.query_params.get('search')
-        if category:
+        status_filter = self.request.query_params.get('status')
+        if category and category != 'all':
             qs = qs.filter(category=category)
+        if status_filter:
+            qs = qs.filter(verification_status=status_filter)
         if search:
             qs = qs.filter(Q(name_en__icontains=search) | Q(name_hi__icontains=search) | Q(description_en__icontains=search))
         return qs
+
+
+class InstitutionalResourceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = InstitutionalResource.objects.all()
+    serializer_class = InstitutionalResourceSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        from accounts.permissions import IsAdminRole
+        return [permissions.IsAuthenticated(), IsAdminRole()]
 
 
 class WeatherForecastView(APIView):

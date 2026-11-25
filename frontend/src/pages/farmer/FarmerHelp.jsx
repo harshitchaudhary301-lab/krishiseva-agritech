@@ -208,13 +208,35 @@ export default function FarmerHelp() {
                   className="bg-white rounded-2xl p-5 border border-slate-200 hover:border-[#84B547] transition shadow-xs flex flex-col justify-between space-y-4"
                 >
                   <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-100">
-                        {s.category_display || s.category}
-                      </span>
-                      <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                        {s.geographic_coverage}
-                      </span>
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-100">
+                          {s.category_display || s.category}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          s.verification_status === 'verified'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : s.verification_status === 'outdated'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {s.verification_status === 'verified'
+                            ? (lang === 'hi' ? '✓ सत्यापित' : '✓ Verified Official')
+                            : s.verification_status === 'outdated'
+                            ? (lang === 'hi' ? 'पुराना संदर्भ' : 'Outdated')
+                            : (lang === 'hi' ? 'समीक्षाधीन' : 'Under Review')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {s.source_publication_date && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            Pub: {s.source_publication_date}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                          {s.geographic_coverage}
+                        </span>
+                      </div>
                     </div>
 
                     <h3 className="font-bold text-slate-900 text-base leading-snug">

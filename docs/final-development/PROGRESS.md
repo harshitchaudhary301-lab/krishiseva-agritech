@@ -236,3 +236,123 @@ All required checks were executed and confirmed:
 | **3. Automated Backend Test Suite** | `python backend/manage.py test accounts bookings services farm_projects` | `Ran 48 tests in 50.938s. OK.` | **PASSED** |
 | **4. Frontend Production Build** | `npm --prefix frontend run build` | `✓ built in 826ms` (0 errors, 0 broken imports). | **PASSED** |
 | **5. Database Integrity** | Verified SQLite isolated database | Preserved 662k villages, 14 users, 9 crop templates, 16 categories. | **PASSED** |
+
+---
+
+## 9. PART 03: AGRICULTURAL MODULE COMPLETION (KS-FDC-03)
+
+**Task ID:** KS-FDC-03  
+**Master Specification:** KS-FPC-001  
+**Branch:** `mission03-mvp`  
+**Execution Mode:** Efficient Implementation  
+**Status:** **COMPLETE** (All Batches A → E Fully Implemented, Verified & Integrated)
+
+---
+
+### 9.1 Completed Batches & Technical Implementations
+
+#### BATCH A — Agricultural Foundation
+
+1. **A1. Land Intelligence (`backend/farm_projects`, `frontend/src/pages/farmer/FarmerFarms.jsx`):**
+   - **Models & Serializers Extended:** Added `original_area_value`, `original_area_unit` (e.g., acre, bigha, hectare), `land_tenure` (`owned`, `leased`, `sharecropped`), and `history_notes` to `Field`. Preserves original farmer-entered measurement units without fabricating unverified universal bigha conversions.
+   - **Validation:** Enforced positive area validation (`area_acres > 0`, `original_area_value > 0`) in `FieldSerializer` and `FarmSerializer`.
+   - **API & Views:** Implemented `FieldListCreateView` and `FieldDetailView` at `/api/farm-projects/fields/` and `/api/farm-projects/fields/<int:pk>/` (ordered by name, user-scoped).
+   - **Frontend Integration:** Added interactive "+ Add Parcel" modal in `FarmerFarms.jsx` to manage individual field parcels per farm with land tenure, unit selection, and delete capabilities.
+
+2. **A2. Soil Intelligence (`backend/farm_projects`, `frontend/src/pages/farmer/FarmerFarms.jsx`):**
+   - **Data Alignment & Sources:** Referenced Soil Health Card portal (`https://soilhealth.dac.gov.in/`) and ICAR soil testing benchmarks.
+   - **Parameter Aliases & Mapping:** Updated `SoilReportSerializer` with bidirectional alias handling (`to_internal_value` and `to_representation`) bridging frontend parameter names (`electrical_conductivity` ↔ `ec`, `organic_carbon_percentage` ↔ `organic_carbon_percent`, `nitrogen_kg_per_ha` ↔ `nitrogen_kg_ha`, etc.).
+   - **Validation:** Added numeric range validation for reported values (pH: 0–14, EC ≥ 0, Organic Carbon ≥ 0, Nutrients ≥ 0).
+   - **Field Linking:** Soil reports link directly to field parcels via `field_id`. Frontend farm view displays field parcel association and laboratory accreditation details without generating synthetic chemical recommendations.
+
+3. **A3. Crop Intelligence (`backend/farm_projects`, `backend/farm_projects/management/commands/seed_crop_templates.py`):**
+   - **Approved Crops & Cultivation Variations:** Preserved all 6 required crops across 9 distinct cultivation templates:
+     - Wheat (Timely Sown Irrigated)
+     - Paddy (Transplanted) & Paddy (Direct Seeded / DSR)
+     - Sugarcane (New Planting) & Sugarcane (Ratoon Management)
+     - Mustard (Toria & Indian Mustard Irrigated)
+     - Maize (Grain Cultivation) & Maize (Fodder Cultivation)
+     - Potato (Early & Main Autumn Planting)
+   - **Official Institution References:** Extended `CropTemplate` model with `source_institution` and `source_url`, mapped to authoritative ICAR institutions:
+     - ICAR-IIWBR Karnal (`https://www.iiwbr.org/`) for Wheat
+     - ICAR-IIRR Hyderabad (`https://www.iirr.org/`) for Paddy
+     - ICAR-IISR Lucknow (`https://iisr.icar.gov.in/`) for Sugarcane
+     - ICAR-DRMR Bharatpur (`https://www.drmr.res.in/`) for Mustard
+     - ICAR-IIMR Ludhiana (`https://iimr.icar.gov.in/`) for Maize
+     - ICAR-CPRI Shimla (`https://cpri.icar.gov.in/`) for Potato
+   - **Project Template Versioning:** Editable farm projects instantiate from templates while freezing `template_version` to protect against upstream template mutations.
+
+4. **A4. Seed Intelligence (`backend/farm_projects`, `frontend/src/pages/farmer/FarmerProjectDetail.jsx`):**
+   - **Models & Serializers Extended:** Added `operation` (`ForeignKey` to `ProjectOperation`) and `expense` (`OneToOneField` to `ExpenseRecord`) on `SeedProcurementRecord`.
+   - **Financial Ledger Integration (FIN-01 to FIN-12):** When seed records are logged with recorded costs, an `ExpenseRecord` (`record_type='incurred'`) is automatically and idempotently linked with traceable references (`source_reference="Seed procurement: <variety> (Lot: <lot>)"`), preventing duplicate expense accruals on updates or resubmission.
+   - **Frontend Integration:** Added linked project operation selection in the Seed modal and rendered linked operation sequence and verified financial ledger badge in the Seed tab of `FarmerProjectDetail.jsx`.
+
+---
+
+#### BATCH B — Weather Integration
+
+1. **Adapter Architecture & Candidate Evaluation (`backend/services/weather.py`, `backend/services/views.py`):**
+   - **Data Sources:** Primary IMD evaluation; implemented Open-Meteo API integration (`https://open-meteo.com/en/docs`) with coordinate-based and district centroid resolution.
+   - **Normalized Schema:** Returns consistent structure: `location`, `temperature_c`, `rainfall_mm` / `precipitation_mm`, `humidity_percent`, `wind_speed_kmh`, `condition_en`, `condition_hi`, `forecast_3_day`, `data_source`, `observation_timestamp`, `last_updated`, `freshness_status` (`fresh` vs `offline_benchmark`), and `booking_policy`.
+   - **Server-Side Resilience:** 5-second timeout, graceful offline benchmark fallback on network failure or rate limit, 15-minute in-memory cache, and non-prescriptive advisory policy.
+   - **Frontend Weather Card:** Visualized on `FarmerProjectDetail.jsx` showing current conditions, 3-day forecast, data source attribution, and policy notice: *"Weather forecasts are advisory references only. Bookings and scheduled farm operations require mutual farmer-provider confirmation and are never automatically altered by forecast models."*
+
+---
+
+#### BATCH C — Crop Monitoring & Post-Harvest
+
+1. **C1. Crop Monitoring (`backend/farm_projects`, `frontend/src/pages/farmer/FarmerProjectDetail.jsx`):**
+   - **Observation Records:** Linked `CropObservation` to `field` parcel and `operation`. Stores observation date, phenological growth stage, crop condition (`healthy`, `normal`, `stressed`, `pest_attack`, `disease`), field notes, and reported concerns.
+   - **Project Integration:** Observations rendered chronologically in `FarmerProjectDetail.jsx` with growth stage, condition badge, linked operation tag, and field parcel tag.
+
+2. **C2. Post-Harvest Management (`backend/farm_projects`, `frontend/src/pages/farmer/FarmerProjectDetail.jsx`):**
+   - **Yield & Storage Records:** `PostHarvestRecord` stores produce quantity, measurement unit, quality grade, storage type, storage location, duration, and transportation requirements.
+   - **Marketplace Service Request Reuse:** Implemented `PostHarvestRequestServiceView` (`POST /api/farm-projects/post-harvest/<pk>/request-service/`), reusing the existing marketplace `ServiceRequest` and provider quotation workflows for storage and transportation instead of fragmenting into separate engines.
+   - **Financial Ledger Traceability:**
+     - Storage and transportation costs link idempotently to `ExpenseRecord` entries.
+     - Crop sale and revenue records (`RevenueRecord`) link directly to `PostHarvestRecord` via `revenue_record` OneToOneField.
+     - Realized revenue immediately updates project-level financial summaries and net surplus (FIN-12).
+   - **Frontend Modal:** Added "Record Sale & Revenue" modal in `FarmerProjectDetail.jsx` capturing quantity (quintals), rate per quintal, buyer/mill name, and sale date with live calculated revenue preview.
+
+---
+
+#### BATCH D — Analytics & Government Connect
+
+1. **D1. Farm Analytics (`backend/farm_projects/views.py`, `frontend/src/pages/farmer/FarmerAnalytics.jsx`):**
+   - **ORM Aggregations:** Aggregates operational progress, cultivated acreage, financial commitments, incurred costs, payments, outstanding balance, realized revenue, and net surplus across all farmer projects.
+   - **Dynamic Filter Support:** Added `farm`/`farm_id`, `project`/`project_id`, and `season` query parameter filtering on `/api/farm-projects/analytics/`.
+   - **Authoritative Progress Formula:** Progress strictly computed as `completed_applicable / total_applicable` (excluding cancelled tasks). If total applicable tasks is zero, returns `None` and displays `'N/A'` (zero activity distinguished from 0% progress; confirmed bookings never counted as completed operations).
+   - **Interactive UI:** Added interactive filter bar in `FarmerAnalytics.jsx` with Farm, Project, and Season dropdowns plus reset button.
+
+2. **D2. Government & Institutional Connect (`backend/services`, `frontend/src/pages/farmer/FarmerHelp.jsx`):**
+   - **Model Extensions:** Added `source_publication_date` and `verification_status` (`verified`, `under_review`, `outdated`) to `InstitutionalResource`.
+   - **Seed Data:** Populated 17 verified official portals and research institutes across central schemes, state schemes, ICAR institutes, and KVK centers (myScheme, SMAM agrimachinery.nic.in, PM-KISAN, PMFBY, Soil Health Card portal, ICAR-IIWBR, ICAR-IIRR, ICAR-IISR, ICAR-DRMR, ICAR-IIMR, ICAR-CPRI, KVK Meerut, UP Agriculture Portal, etc.).
+   - **Duplicate-Safe Administration:** Implemented `InstitutionalResourceListView` (ListCreate) and `InstitutionalResourceDetailView` (RetrieveUpdateDestroy) with `IsAdminRole` permission for write operations.
+   - **Frontend Integration:** Displayed verification status badges (`✓ Verified Official`, `Under Review`, `Outdated`) and source publication dates in `FarmerHelp.jsx`.
+
+---
+
+#### BATCH E — Shared Integration & Traceability
+
+1. **Authoritative Relational Chain:**
+   ```
+   Farm → Field Parcel → Crop Project → Project Operations → Service Requests → Quotations → Bookings → Expense / Payment Records → Realized Revenue → Farm Analytics
+   ```
+2. **Preserved Platform Constraints:**
+   - Preserved `BOOK-01` to `BOOK-20` state machine rules.
+   - Preserved `FIN-01` to `FIN-12` financial engine contracts.
+   - No duplicate booking or payment systems created.
+   - Zero synthetic, unvalidated agronomic prescriptions generated.
+
+---
+
+### 9.2 Developer Check Verification Matrix (Part 03)
+
+| Check | Executed Command | Outcome | Status |
+|---|---|---|---|
+| **1. Django System Check** | `python backend/manage.py check` | `System check identified no issues (0 silenced).` | **PASSED** |
+| **2. Migration Consistency** | `python backend/manage.py makemigrations --check --dry-run` | `No changes detected` (additive migrations `farm_projects.0007` & `services.0007` cleanly applied). | **PASSED** |
+| **3. Automated Test Suite** | `python backend/manage.py test accounts bookings services farm_projects` | `Ran 48 tests in 87.499s. OK.` (0 failures, 0 errors). | **PASSED** |
+| **4. Frontend Production Build** | `npm --prefix frontend run build` | `✓ built in 1.47s` (2,666 modules transformed, 0 syntax/bundling errors). | **PASSED** |
+| **5. Live Weather Integration** | `python backend/manage.py shell -c "from services.weather import get_weather_forecast; ..."` | Verified Open-Meteo live API resolution (`status: fresh`, `is_live: True`). | **PASSED** |
+| **6. Ledger Traceability** | `python backend/manage.py shell` relational query verification | Seed & Post-Harvest records cleanly linked to `ExpenseRecord` and `RevenueRecord` with zero double entries. | **PASSED** |

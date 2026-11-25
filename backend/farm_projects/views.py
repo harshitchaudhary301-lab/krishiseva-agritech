@@ -70,7 +70,7 @@ class FieldListCreateView(APIView):
 
     def get(self, request, farm_pk):
         farm = get_object_or_404(Farm, pk=farm_pk, farmer=request.user)
-        fields = farm.fields.all()
+        fields = farm.fields.all().order_by('name')
         return Response(FieldSerializer(fields, many=True).data)
 
     def post(self, request, farm_pk):
@@ -80,6 +80,14 @@ class FieldListCreateView(APIView):
             field = serializer.save(farm=farm)
             return Response(FieldSerializer(field).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FieldDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FieldSerializer
+
+    def get_queryset(self):
+        return Field.objects.filter(farm__farmer=self.request.user)
 
 
 class FarmProjectListCreateView(APIView):
@@ -352,6 +360,17 @@ class RevenueRecordListCreateView(APIView):
         serializer = RevenueRecordSerializer(data=request.data)
         if serializer.is_valid():
             rev = serializer.save(project=project)
+
+            # Link post-harvest record if provided
+            ph_id = request.data.get('post_harvest_id') or request.data.get('post_harvest')
+            if ph_id:
+                ph = PostHarvestRecord.objects.filter(pk=ph_id, project=project).first()
+                if ph:
+                    ph.revenue_record = rev
+                    ph.sale_status = 'sold'
+                    ph.save()
+
+            project.update_project_status()
             return Response(RevenueRecordSerializer(rev).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -423,7 +442,7 @@ class SeedProcurementRecordListCreateView(APIView):
     """
     Module 04: Seed Intelligence
     Lists and records seed variety selection, procurement, and expenditure.
-    When seed cost > 0, automatically creates a linked commitment/incurred expense record.
+    When seed cost > 0, idempotently creates/updates a linked expense record to prevent duplicate entries.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -431,7 +450,7 @@ class SeedProcurementRecordListCreateView(APIView):
         project = get_object_or_404(FarmProject, pk=project_pk)
         if project.farmer != request.user and not request.user.is_admin_role():
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        records = project.seed_records.all()
+        records = project.seed_records.select_related('operation', 'expense').all()
         return Response(SeedProcurementRecordSerializer(records, many=True).data)
 
     def post(self, request, project_pk):
@@ -441,11 +460,13 @@ class SeedProcurementRecordListCreateView(APIView):
 
         serializer = SeedProcurementRecordSerializer(data=request.data)
         if serializer.is_valid():
-            seed_rec = serializer.save(project=project)
+            op_id = request.data.get('operation') or request.data.get('operation_id')
+            op = ProjectOperation.objects.filter(pk=op_id, project=project).first() if op_id else None
+
+            seed_rec = serializer.save(project=project, operation=op)
             cost = serializer.validated_data.get('recorded_cost', 0)
             if cost and float(cost) > 0:
-                # Connect directly to Farm Financial Planner (FIN-03)
-                ExpenseRecord.objects.create(
+                exp = ExpenseRecord.objects.create(
                     project=project,
                     title=f"Seed: {seed_rec.variety_name} ({seed_rec.required_quantity} {seed_rec.quantity_unit})",
                     category='seeds',
@@ -454,16 +475,77 @@ class SeedProcurementRecordListCreateView(APIView):
                     status='active',
                     notes=f"Supplier: {seed_rec.supplier_name or 'Local Dealer'} | Lot: {seed_rec.lot_number or 'N/A'}"
                 )
+                seed_rec.expense = exp
+                seed_rec.save()
                 project.update_project_status()
 
             return Response(SeedProcurementRecordSerializer(seed_rec).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class SeedProcurementRecordDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        seed_rec = get_object_or_404(SeedProcurementRecord, pk=pk)
+        if seed_rec.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(SeedProcurementRecordSerializer(seed_rec).data)
+
+    def patch(self, request, pk):
+        seed_rec = get_object_or_404(SeedProcurementRecord, pk=pk)
+        if seed_rec.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = SeedProcurementRecordSerializer(seed_rec, data=request.data, partial=True)
+        if serializer.is_valid():
+            seed_rec = serializer.save()
+            cost = serializer.validated_data.get('recorded_cost', seed_rec.recorded_cost)
+            if cost and float(cost) > 0:
+                if seed_rec.expense:
+                    seed_rec.expense.amount = cost
+                    seed_rec.expense.title = f"Seed: {seed_rec.variety_name} ({seed_rec.required_quantity} {seed_rec.quantity_unit})"
+                    seed_rec.expense.record_type = 'incurred' if seed_rec.procurement_status in ['procured', 'treated', 'sown'] else 'estimate'
+                    seed_rec.expense.notes = f"Supplier: {seed_rec.supplier_name or 'Local Dealer'} | Lot: {seed_rec.lot_number or 'N/A'}"
+                    seed_rec.expense.save()
+                else:
+                    exp = ExpenseRecord.objects.create(
+                        project=seed_rec.project,
+                        title=f"Seed: {seed_rec.variety_name} ({seed_rec.required_quantity} {seed_rec.quantity_unit})",
+                        category='seeds',
+                        record_type='incurred' if seed_rec.procurement_status in ['procured', 'treated', 'sown'] else 'estimate',
+                        amount=cost,
+                        status='active',
+                        notes=f"Supplier: {seed_rec.supplier_name or 'Local Dealer'} | Lot: {seed_rec.lot_number or 'N/A'}"
+                    )
+                    seed_rec.expense = exp
+                    seed_rec.save()
+                seed_rec.project.update_project_status()
+            elif cost == 0 and seed_rec.expense:
+                seed_rec.expense.delete()
+                seed_rec.expense = None
+                seed_rec.save()
+                seed_rec.project.update_project_status()
+
+            return Response(SeedProcurementRecordSerializer(seed_rec).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        seed_rec = get_object_or_404(SeedProcurementRecord, pk=pk)
+        if seed_rec.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        if seed_rec.expense:
+            seed_rec.expense.delete()
+        project = seed_rec.project
+        seed_rec.delete()
+        project.update_project_status()
+        return Response({'message': 'Seed procurement record deleted.'}, status=status.HTTP_204_NO_CONTENT)
+
+
 class CropObservationListCreateView(APIView):
     """
     Module 09: Crop Monitoring
-    Lists and records manual crop observation notes, growth stages, and field concerns.
+    Lists and records manual crop observation notes, growth stages, field parcels, and concerns.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -471,7 +553,7 @@ class CropObservationListCreateView(APIView):
         project = get_object_or_404(FarmProject, pk=project_pk)
         if project.farmer != request.user and not request.user.is_admin_role():
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        observations = project.observations.select_related('operation').all()
+        observations = project.observations.select_related('operation', 'field').all().order_by('-observation_date', '-created_at')
         return Response(CropObservationSerializer(observations, many=True).data)
 
     def post(self, request, project_pk):
@@ -481,9 +563,42 @@ class CropObservationListCreateView(APIView):
 
         serializer = CropObservationSerializer(data=request.data)
         if serializer.is_valid():
-            obs = serializer.save(project=project)
+            field_id = request.data.get('field') or request.data.get('field_id')
+            field = Field.objects.filter(pk=field_id).first() if field_id else project.field
+
+            op_id = request.data.get('operation') or request.data.get('operation_id')
+            op = ProjectOperation.objects.filter(pk=op_id, project=project).first() if op_id else None
+
+            obs = serializer.save(project=project, field=field, operation=op)
             return Response(CropObservationSerializer(obs).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CropObservationDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        obs = get_object_or_404(CropObservation, pk=pk)
+        if obs.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(CropObservationSerializer(obs).data)
+
+    def patch(self, request, pk):
+        obs = get_object_or_404(CropObservation, pk=pk)
+        if obs.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = CropObservationSerializer(obs, data=request.data, partial=True)
+        if serializer.is_valid():
+            obs = serializer.save()
+            return Response(CropObservationSerializer(obs).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        obs = get_object_or_404(CropObservation, pk=pk)
+        if obs.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        obs.delete()
+        return Response({'message': 'Observation deleted.'}, status=status.HTTP_204_NO_CONTENT)
 
 
 class PostHarvestRecordListCreateView(APIView):
@@ -497,7 +612,7 @@ class PostHarvestRecordListCreateView(APIView):
         project = get_object_or_404(FarmProject, pk=project_pk)
         if project.farmer != request.user and not request.user.is_admin_role():
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        records = project.post_harvest_records.all()
+        records = project.post_harvest_records.select_related('transport_service_request', 'storage_service_request', 'revenue_record').all()
         return Response(PostHarvestRecordSerializer(records, many=True).data)
 
     def post(self, request, project_pk):
@@ -509,10 +624,10 @@ class PostHarvestRecordListCreateView(APIView):
         if serializer.is_valid():
             ph_rec = serializer.save(project=project)
 
-            # Record storage or transport costs into financial planner if present
+            # Record storage or transport costs idempotently into financial planner
             storage_cost = serializer.validated_data.get('storage_cost_inr', 0)
             if storage_cost and float(storage_cost) > 0:
-                ExpenseRecord.objects.create(
+                exp_storage = ExpenseRecord.objects.create(
                     project=project,
                     title=f"Post-Harvest Storage: {ph_rec.get_storage_type_display()} ({ph_rec.storage_duration_days} days)",
                     category='storage',
@@ -520,10 +635,11 @@ class PostHarvestRecordListCreateView(APIView):
                     amount=storage_cost,
                     status='active'
                 )
+                ph_rec.storage_expense = exp_storage
 
             transport_cost = serializer.validated_data.get('transport_cost_inr', 0)
             if transport_cost and float(transport_cost) > 0:
-                ExpenseRecord.objects.create(
+                exp_transport = ExpenseRecord.objects.create(
                     project=project,
                     title=f"Post-Harvest Transport: {ph_rec.produce_quantity} {ph_rec.quantity_unit} to {ph_rec.storage_location or 'Facility'}",
                     category='transportation',
@@ -531,10 +647,156 @@ class PostHarvestRecordListCreateView(APIView):
                     amount=transport_cost,
                     status='active'
                 )
+                ph_rec.transport_expense = exp_transport
 
+            ph_rec.save()
             project.update_project_status()
             return Response(PostHarvestRecordSerializer(ph_rec).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PostHarvestRecordDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        ph = get_object_or_404(PostHarvestRecord, pk=pk)
+        if ph.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(PostHarvestRecordSerializer(ph).data)
+
+    def patch(self, request, pk):
+        ph = get_object_or_404(PostHarvestRecord, pk=pk)
+        if ph.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = PostHarvestRecordSerializer(ph, data=request.data, partial=True)
+        if serializer.is_valid():
+            ph = serializer.save()
+            # Update storage and transport expenses idempotently
+            storage_cost = serializer.validated_data.get('storage_cost_inr', ph.storage_cost_inr)
+            if storage_cost and float(storage_cost) > 0:
+                if ph.storage_expense:
+                    ph.storage_expense.amount = storage_cost
+                    ph.storage_expense.save()
+                else:
+                    ph.storage_expense = ExpenseRecord.objects.create(
+                        project=ph.project,
+                        title=f"Post-Harvest Storage: {ph.get_storage_type_display()} ({ph.storage_duration_days} days)",
+                        category='storage',
+                        record_type='incurred',
+                        amount=storage_cost,
+                        status='active'
+                    )
+                    ph.save()
+
+            transport_cost = serializer.validated_data.get('transport_cost_inr', ph.transport_cost_inr)
+            if transport_cost and float(transport_cost) > 0:
+                if ph.transport_expense:
+                    ph.transport_expense.amount = transport_cost
+                    ph.transport_expense.save()
+                else:
+                    ph.transport_expense = ExpenseRecord.objects.create(
+                        project=ph.project,
+                        title=f"Post-Harvest Transport: {ph.produce_quantity} {ph.quantity_unit} to {ph.storage_location or 'Facility'}",
+                        category='transportation',
+                        record_type='incurred',
+                        amount=transport_cost,
+                        status='active'
+                    )
+                    ph.save()
+
+            ph.project.update_project_status()
+            return Response(PostHarvestRecordSerializer(ph).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        ph = get_object_or_404(PostHarvestRecord, pk=pk)
+        if ph.project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+        if ph.storage_expense:
+            ph.storage_expense.delete()
+        if ph.transport_expense:
+            ph.transport_expense.delete()
+        project = ph.project
+        ph.delete()
+        project.update_project_status()
+        return Response({'message': 'Post-harvest record deleted.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class PostHarvestRequestServiceView(APIView):
+    """
+    Connects post-harvest storage and transportation to the existing Marketplace!
+    Reuses existing ServiceRequest, Quotation, and Booking workflows.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        ph = get_object_or_404(PostHarvestRecord, pk=pk)
+        project = ph.project
+
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        service_type = request.data.get('service_type', 'transportation')  # 'transportation' or 'storage'
+
+        # Check existing active request
+        if service_type == 'transportation' and ph.transport_service_request and ph.transport_service_request.status in ['open', 'quote_accepted', 'booked']:
+            return Response({
+                'error': f"Harvest record already has an active Transport request (REQ-{ph.transport_service_request_id}).",
+                'service_request_id': ph.transport_service_request_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if service_type == 'storage' and ph.storage_service_request and ph.storage_service_request.status in ['open', 'quote_accepted', 'booked']:
+            return Response({
+                'error': f"Harvest record already has an active Storage request (REQ-{ph.storage_service_request_id}).",
+                'service_request_id': ph.storage_service_request_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        cat_slug = 'transportation' if service_type == 'transportation' else 'storage'
+        category = ServiceCategory.objects.filter(slug=cat_slug).first()
+        if not category:
+            category = ServiceCategory.objects.filter(name_en__icontains=cat_slug).first()
+        if not category:
+            return Response({'error': f"Service category for '{service_type}' not found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        farm = project.farm
+        village = farm.village if farm else request.user.village
+        district = farm.district if farm else request.user.district
+        state = farm.state if farm else request.user.state
+
+        title = request.data.get('title') or f"Post-Harvest {service_type.capitalize()}: {ph.produce_quantity} {ph.quantity_unit} {project.crop}"
+        desc = request.data.get('description') or f"Required for {ph.produce_quantity} {ph.quantity_unit} of {project.crop} ({ph.quality_grade}) from {project.name}. Destination: {ph.storage_location or 'Local Warehouse/Mandi'}."
+        scope = request.data.get('scope_quantity') or f"{ph.produce_quantity} {ph.quantity_unit}"
+        req_date = request.data.get('required_date') or ph.harvest_date or timezone.localdate()
+
+        from bookings.models import ServiceRequest
+        srv_req = ServiceRequest.objects.create(
+            farmer=request.user,
+            category=category,
+            farm_project=project,
+            title=title,
+            description=desc,
+            village=village,
+            district=district,
+            state=state,
+            required_date=req_date,
+            scope_quantity=scope,
+            budget_max=request.data.get('budget_max')
+        )
+
+        if service_type == 'transportation':
+            ph.transport_required = True
+            ph.transport_service_request = srv_req
+        else:
+            ph.storage_service_request = srv_req
+        ph.save()
+
+        from bookings.serializers import ServiceRequestSerializer
+        return Response({
+            'message': f"Linked {service_type} service request created in Marketplace.",
+            'service_request': ServiceRequestSerializer(srv_req).data,
+            'post_harvest_id': ph.id
+        }, status=status.HTTP_201_CREATED)
 
 
 class ProjectOperationManualCompleteView(APIView):
@@ -571,11 +833,25 @@ class FarmAnalyticsView(APIView):
         from decimal import Decimal
         user = request.user
         projects_qs = FarmProject.objects.filter(farmer=user)
+
+        # Filters: farm, project, and season
+        farm_id = request.query_params.get('farm') or request.query_params.get('farm_id')
+        if farm_id:
+            projects_qs = projects_qs.filter(farm_id=farm_id)
+
+        project_id = request.query_params.get('project') or request.query_params.get('project_id')
+        if project_id:
+            projects_qs = projects_qs.filter(id=project_id)
+
+        season = request.query_params.get('season')
+        if season:
+            projects_qs = projects_qs.filter(crop_template__season=season)
+
         total_projects = projects_qs.count()
         active_projects = projects_qs.filter(status__in=['planning', 'ready', 'in_progress']).count()
         completed_projects = projects_qs.filter(status='completed').count()
 
-        all_operations = ProjectOperation.objects.filter(project__farmer=user)
+        all_operations = ProjectOperation.objects.filter(project__in=projects_qs)
         total_ops = all_operations.count()
         completed_ops = all_operations.filter(status='completed').count()
         ready_ops = all_operations.filter(status='ready').count()
@@ -672,7 +948,15 @@ class FarmAnalyticsView(APIView):
                 'economic_disclaimer': 'Descriptive operational and financial summary based on platform records; not a certified financial audit.'
             },
             'projects': project_summaries,
-            'crop_breakdown': formatted_crop_breakdown
+            'crop_breakdown': formatted_crop_breakdown,
+            'filters': {
+                'available_farms': list(Farm.objects.filter(farmer=user).values('id', 'name')),
+                'available_projects': list(FarmProject.objects.filter(farmer=user).values('id', 'name', 'crop')),
+                'available_seasons': ['Rabi', 'Kharif', 'Zaid', 'Annual'],
+                'selected_farm': farm_id,
+                'selected_project': project_id,
+                'selected_season': season,
+            }
         })
 
 

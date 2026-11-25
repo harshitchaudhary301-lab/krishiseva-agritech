@@ -3,7 +3,7 @@ from .views import (
     CategoryListView, VillageListView, ProviderDirectoryView, ReviewListCreateView,
     HistoricalMachineryRateListView, HistoricalAgriculturalWageListView,
     AgriculturalReferenceRecordListView,
-    InstitutionalResourceListView,
+    InstitutionalResourceListView, InstitutionalResourceDetailView,
     WeatherForecastView,
     StateListView, DistrictListView, SubDistrictListView, DevelopmentBlockListView,
     LocalBodyListView, WardListView, NationwideVillageListView, LocationSearchView,
@@ -23,6 +23,7 @@ urlpatterns = [
     path('reference-data/wages/', HistoricalAgriculturalWageListView.as_view(), name='historical-wages'),
     path('reference-data/records/', AgriculturalReferenceRecordListView.as_view(), name='agricultural-reference-records'),
     path('government-connect/', InstitutionalResourceListView.as_view(), name='government-connect'),
+    path('government-connect/<int:pk>/', InstitutionalResourceDetailView.as_view(), name='government-connect-detail'),
     path('weather/', WeatherForecastView.as_view(), name='weather-forecast'),
 
     # Provider Self-Management Endpoints

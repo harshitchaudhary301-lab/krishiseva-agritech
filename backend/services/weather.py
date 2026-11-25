@@ -81,7 +81,8 @@ def get_weather_forecast(latitude=None, longitude=None, district='Meerut'):
                     })
 
                 result = {
-                    'status': 'live_data',
+                    'status': 'fresh',
+                    'freshness_status': 'fresh',
                     'is_live': True,
                     'location': {
                         'district': district,
@@ -92,16 +93,22 @@ def get_weather_forecast(latitude=None, longitude=None, district='Meerut'):
                         'temperature_c': current.get('temperature_2m'),
                         'humidity_percent': current.get('relative_humidity_2m'),
                         'precipitation_mm': current.get('precipitation', 0.0),
+                        'rainfall_mm': current.get('precipitation', 0.0),
                         'wind_speed_kmh': current.get('wind_speed_10m'),
                         'condition_en': condition_en,
                         'condition_hi': condition_hi
                     },
+                    'temperature_c': current.get('temperature_2m'),
+                    'rainfall_mm': current.get('precipitation', 0.0),
                     'forecast_3_day': forecast_days,
                     'agro_advisory_en': generate_agro_advisory(condition_en, current.get('precipitation', 0.0), 'en'),
                     'agro_advisory_hi': generate_agro_advisory(condition_en, current.get('precipitation', 0.0), 'hi'),
+                    'data_source': 'Open-Meteo Public Weather API (CC-BY 4.0)',
+                    'observation_timestamp': now_iso,
+                    'last_updated': now_iso,
                     'data_timestamp': now_iso,
                     'attribution': 'Open-Meteo & IMD Agro-Meteorological Public Reference (CC-BY 4.0)',
-                    'data_freshness': 'Live cached query',
+                    'data_freshness': 'Live verified query',
                     'booking_policy': 'Read-only agricultural advisory. Weather forecasts do not automatically cancel confirmed bookings.'
                 }
 
@@ -114,7 +121,8 @@ def get_weather_forecast(latitude=None, longitude=None, district='Meerut'):
 
     # Clean Fallback State (No fake random numbers; clear indicators)
     return {
-        'status': 'offline_fallback',
+        'status': 'offline_benchmark',
+        'freshness_status': 'offline_benchmark',
         'is_live': False,
         'location': {
             'district': district,
@@ -125,10 +133,13 @@ def get_weather_forecast(latitude=None, longitude=None, district='Meerut'):
             'temperature_c': 24.0,
             'humidity_percent': 60,
             'precipitation_mm': 0.0,
+            'rainfall_mm': 0.0,
             'wind_speed_kmh': 8.5,
             'condition_en': 'Partly Cloudy (Seasonal Benchmark)',
             'condition_hi': 'आंशिक रूप से बादल (मौसमी मानक)'
         },
+        'temperature_c': 24.0,
+        'rainfall_mm': 0.0,
         'forecast_3_day': [
             {'date': 'Day 1', 'temp_max': 26.0, 'temp_min': 14.0, 'precipitation_mm': 0.0, 'condition_en': 'Clear', 'condition_hi': 'साफ'},
             {'date': 'Day 2', 'temp_max': 27.0, 'temp_min': 15.0, 'precipitation_mm': 0.0, 'condition_en': 'Clear', 'condition_hi': 'साफ'},
@@ -136,6 +147,9 @@ def get_weather_forecast(latitude=None, longitude=None, district='Meerut'):
         ],
         'agro_advisory_en': 'Weather conditions are generally favorable for field operations and wheat irrigation. Check field soil moisture prior to mechanical harvesting.',
         'agro_advisory_hi': 'खेत कार्यों और गेहूं की सिंचाई के लिए मौसम अनुकूल है। मशीनी कटाई से पहले खेत की नमी की जांच अवश्य करें।',
+        'data_source': 'IMD Seasonal Agro-Advisory Benchmark / Offline Reference',
+        'observation_timestamp': now_iso,
+        'last_updated': now_iso,
         'data_timestamp': now_iso,
         'attribution': 'IMD Seasonal Agro-Advisory Benchmark / Offline Reference',
         'data_freshness': 'Standard seasonal reference (live source unavailable)',

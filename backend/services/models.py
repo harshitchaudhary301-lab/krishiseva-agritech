@@ -518,6 +518,12 @@ class InstitutionalResource(models.Model):
     implementing_agency = models.CharField(max_length=200, blank=True)
     contact_info = models.CharField(max_length=200, blank=True)
     is_verified = models.BooleanField(default=True)
+    verification_status = models.CharField(max_length=30, default='verified', choices=[
+        ('verified', 'Verified Official'),
+        ('unverified', 'Pending Review'),
+        ('outdated', 'Outdated / Needs Review')
+    ])
+    source_publication_date = models.DateField(null=True, blank=True, help_text="Publication date of source scheme/document")
     last_reviewed_date = models.DateField(default=timezone.localdate)
     display_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

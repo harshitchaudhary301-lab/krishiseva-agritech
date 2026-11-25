@@ -4,7 +4,7 @@ import {
   ArrowLeft, FolderKanban, Plus, CheckCircle2, Clock, Calendar,
   Tractor, Users, Wrench, Droplet, Truck, Building2, AlertTriangle,
   ArrowRight, IndianRupee, Loader2, Sparkles, ShieldCheck,
-  Sprout, Eye, PackageCheck, Warehouse, ShieldAlert, Check
+  Sprout, Eye, PackageCheck, Warehouse, ShieldAlert, Check, CloudSun
 } from 'lucide-react';
 import api from '../../api/client';
 import { useLanguage } from '../../context/LanguageContext';
@@ -21,6 +21,8 @@ export default function FarmerProjectDetail() {
   const [seeds, setSeeds] = useState([]);
   const [observations, setObservations] = useState([]);
   const [postHarvestRecords, setPostHarvestRecords] = useState([]);
+  const [revenues, setRevenues] = useState([]);
+  const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [createReqOpen, setCreateReqOpen] = useState(false);
@@ -76,6 +78,8 @@ export default function FarmerProjectDetail() {
   const [showSeedModal, setShowSeedModal] = useState(false);
   const [showObsModal, setShowObsModal] = useState(false);
   const [showPostHarvestModal, setShowPostHarvestModal] = useState(false);
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
+  const [selectedPhForRevenue, setSelectedPhForRevenue] = useState(null);
   const [submittingModal, setSubmittingModal] = useState(false);
 
   // Active workspace tab
@@ -93,14 +97,17 @@ export default function FarmerProjectDetail() {
     supplier_name: 'National Seeds Corporation Meerut',
     purchase_date: new Date().toISOString().split('T')[0],
     lot_number: 'NSC-2026-WHT-89',
-    recorded_cost: '1800.00'
+    recorded_cost: '1800.00',
+    operation: ''
   });
 
   const [obsForm, setObsForm] = useState({
     growth_stage: 'Tillering / Vegetative',
     crop_condition: 'healthy',
     field_notes: 'Uniform emergence across plots. Irrigation completed smoothly.',
-    reported_concerns: 'None'
+    reported_concerns: 'None',
+    operation: '',
+    field: ''
   });
 
   const [postHarvestForm, setPostHarvestForm] = useState({
@@ -108,13 +115,21 @@ export default function FarmerProjectDetail() {
     produce_quantity: '220.0',
     unit: 'quintal',
     quality_grade: 'Grade A',
-    storage_type: 'warehouse',
+    storage_type: 'commercial_warehouse',
     storage_location: 'Central Warehousing Corporation Meerut',
     storage_days: '45',
     storage_cost: '2200.00',
     transport_required: true,
     transport_cost: '1500.00',
-    sale_status: 'in_storage'
+    sale_status: 'unsold'
+  });
+
+  const [revenueForm, setRevenueForm] = useState({
+    quantity_quintals: '',
+    rate_per_quintal: '',
+    buyer_name: '',
+    mandi_or_mill: '',
+    sale_date: new Date().toISOString().split('T')[0]
   });
 
   const handleCompleteOperation = async (opId) => {
@@ -152,21 +167,30 @@ export default function FarmerProjectDetail() {
   const fetchProjectDetails = async () => {
     setLoading(true);
     try {
-      const [projRes, catRes, seedsRes, obsRes, phRes] = await Promise.all([
+      const [projRes, catRes, seedsRes, obsRes, phRes, revRes] = await Promise.all([
         api.get(`/farm-projects/projects/${id}/`),
         api.get('/services/categories/'),
         api.get(`/farm-projects/projects/${id}/seeds/`).catch(() => ({ data: [] })),
         api.get(`/farm-projects/projects/${id}/observations/`).catch(() => ({ data: [] })),
-        api.get(`/farm-projects/projects/${id}/post-harvest/`).catch(() => ({ data: [] }))
+        api.get(`/farm-projects/projects/${id}/post-harvest/`).catch(() => ({ data: [] })),
+        api.get(`/farm-projects/projects/${id}/revenues/`).catch(() => ({ data: [] }))
       ]);
       setProject(projRes.data);
       setCategories(catRes.data);
       setSeeds(seedsRes.data);
       setObservations(obsRes.data);
       setPostHarvestRecords(phRes.data);
+      setRevenues(revRes.data);
+
       if (projRes.data?.crop && !seedForm.crop) {
         setSeedForm(prev => ({ ...prev, crop: projRes.data.crop }));
       }
+
+      // Fetch Weather Intelligence for project locality
+      const districtName = projRes.data?.farm_name ? projRes.data.farm_name.split('—')[1]?.trim() || 'Meerut' : 'Meerut';
+      api.get(`/services/weather/?district=${encodeURIComponent(districtName)}`).then(wRes => {
+        if (wRes?.data) setWeather(wRes.data);
+      }).catch(() => {});
     } catch (err) {
       console.error(err);
       setError('Failed to load farm project.');
@@ -207,6 +231,7 @@ export default function FarmerProjectDetail() {
     try {
       await api.post(`/farm-projects/projects/${id}/seeds/`, {
         ...seedForm,
+        operation: seedForm.operation ? parseInt(seedForm.operation, 10) : null,
         required_quantity: parseFloat(seedForm.required_quantity),
         recorded_cost: parseFloat(seedForm.recorded_cost)
       });
@@ -224,7 +249,11 @@ export default function FarmerProjectDetail() {
     e.preventDefault();
     setSubmittingModal(true);
     try {
-      await api.post(`/farm-projects/projects/${id}/observations/`, obsForm);
+      await api.post(`/farm-projects/projects/${id}/observations/`, {
+        ...obsForm,
+        operation: obsForm.operation ? parseInt(obsForm.operation, 10) : null,
+        field: obsForm.field ? parseInt(obsForm.field, 10) : (project.field || null)
+      });
       setShowObsModal(false);
       fetchProjectDetails();
     } catch (err) {
@@ -242,15 +271,62 @@ export default function FarmerProjectDetail() {
       await api.post(`/farm-projects/projects/${id}/post-harvest/`, {
         ...postHarvestForm,
         produce_quantity: parseFloat(postHarvestForm.produce_quantity),
-        storage_days: parseInt(postHarvestForm.storage_days, 10),
-        storage_cost: parseFloat(postHarvestForm.storage_cost),
-        transport_cost: parseFloat(postHarvestForm.transport_cost)
+        storage_duration_days: parseInt(postHarvestForm.storage_days || 0, 10),
+        storage_cost_inr: parseFloat(postHarvestForm.storage_cost || 0),
+        transport_cost_inr: parseFloat(postHarvestForm.transport_cost || 0)
       });
       setShowPostHarvestModal(false);
       fetchProjectDetails();
     } catch (err) {
       console.error(err);
       alert('Failed to save post-harvest record.');
+    } finally {
+      setSubmittingModal(false);
+    }
+  };
+
+  const handleRequestPostHarvestService = async (phId, serviceType) => {
+    try {
+      await api.post(`/farm-projects/post-harvest/${phId}/request-service/`, {
+        service_type: serviceType
+      });
+      alert(lang === 'hi'
+        ? `कटाई-उपरांत ${serviceType === 'transportation' ? 'परिवहन' : 'भंडारण'} के लिए सेवा मांग (Marketplace Service Request) सफलतापूर्वक बनाई गई!`
+        : `Post-harvest ${serviceType} service request successfully created in Marketplace!`);
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || `Failed to request ${serviceType} service.`);
+    }
+  };
+
+  const handleSaveRevenue = async (e) => {
+    e.preventDefault();
+    setSubmittingModal(true);
+    try {
+      await api.post(`/farm-projects/projects/${id}/revenues/`, {
+        crop: project.crop,
+        quantity_quintals: parseFloat(revenueForm.quantity_quintals),
+        rate_per_quintal: parseFloat(revenueForm.rate_per_quintal),
+        buyer_name: revenueForm.buyer_name,
+        mandi_or_mill: revenueForm.mandi_or_mill,
+        sale_date: revenueForm.sale_date,
+        post_harvest_id: selectedPhForRevenue?.id || null
+      });
+      setShowRevenueModal(false);
+      setSelectedPhForRevenue(null);
+      setRevenueForm({
+        quantity_quintals: '',
+        rate_per_quintal: '',
+        buyer_name: '',
+        mandi_or_mill: '',
+        sale_date: new Date().toISOString().split('T')[0]
+      });
+      alert(lang === 'hi' ? 'फसल बिक्री व राजस्व सफलतापूर्वक दर्ज किया गया।' : 'Crop sale & realized revenue recorded successfully.');
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to record crop revenue.');
     } finally {
       setSubmittingModal(false);
     }
@@ -392,6 +468,64 @@ export default function FarmerProjectDetail() {
           </div>
         )}
       </div>
+
+      {/* Weather Intelligence Reference Card (Module 05) */}
+      {weather && (
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+              <CloudSun className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                  Weather Intelligence
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  weather.freshness_status === 'fresh' || weather.is_live
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {weather.freshness_status === 'fresh' || weather.is_live
+                    ? (lang === 'hi' ? 'लाइव मौसम' : 'Live Verified')
+                    : (lang === 'hi' ? 'मौसमी मानक संदर्भ' : 'Offline Reference')}
+                </span>
+              </div>
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+                <span>{weather.location?.district || 'Meerut'}</span>
+                <span>•</span>
+                <span className="text-emerald-700 font-extrabold">{weather.current?.temperature_c ?? weather.temperature_c}°C</span>
+                <span>•</span>
+                <span className="font-medium text-slate-600">
+                  {lang === 'hi' ? weather.current?.condition_hi : weather.current?.condition_en}
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Rainfall: <strong>{weather.current?.rainfall_mm ?? weather.current?.precipitation_mm ?? 0} mm</strong> · Humidity: <strong>{weather.current?.humidity_percent}%</strong> · Wind: <strong>{weather.current?.wind_speed_kmh} km/h</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {weather.forecast_3_day && (
+              <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                {weather.forecast_3_day.slice(0, 3).map((f, i) => (
+                  <div key={i} className="text-center px-2 py-1">
+                    <span className="text-[9px] font-bold text-slate-400 block">{f.date}</span>
+                    <span className="text-xs font-black text-slate-800">{f.temp_max}°</span>
+                    <span className="text-[9px] text-slate-500 block">{f.precipitation_mm > 0 ? `${f.precipitation_mm}mm` : (lang === 'hi' ? f.condition_hi : f.condition_en)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="text-[10px] text-slate-400 max-w-xs leading-tight">
+              <div>Source: {weather.data_source || weather.attribution}</div>
+              <div className="text-slate-500 font-medium mt-0.5">{weather.booking_policy}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Visual Operations Timeline & Milestones */}
       <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xs space-y-4">
@@ -1022,9 +1156,21 @@ export default function FarmerProjectDetail() {
                       <div><strong>Breeder Source:</strong> {s.breeder_source || s.source_breeder}</div>
                       <div><strong>Supplier:</strong> {s.supplier_name || 'Direct / NSC'}</div>
                       <div><strong>Lot Number:</strong> <span className="font-mono text-slate-700">{s.lot_number || 'N/A'}</span></div>
+                      {s.operation_name && (
+                        <div className="text-slate-700">
+                          <strong>Linked Operation:</strong> #{s.operation_sequence} {s.operation_name}
+                        </div>
+                      )}
                       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                         <span>Quantity: <strong>{s.required_quantity} {s.unit || s.quantity_unit}</strong></span>
-                        <span className="font-bold text-[#174D32]">Cost: ₹{Number(s.recorded_cost).toLocaleString()}</span>
+                        <div className="text-right">
+                          <span className="font-bold text-[#174D32] block">Cost: ₹{Number(s.recorded_cost).toLocaleString()}</span>
+                          {s.expense && (
+                            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              Ledger Linked (FIN-03)
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1072,6 +1218,16 @@ export default function FarmerProjectDetail() {
                           Condition: {obs.crop_condition}
                         </span>
                         <span className="text-[11px] text-slate-400">Date: {obs.observation_date}</span>
+                        {obs.operation_name && (
+                          <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                            Op: {obs.operation_name}
+                          </span>
+                        )}
+                        {obs.field_name && (
+                          <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            Field: {obs.field_name}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-600 leading-relaxed">{obs.field_notes}</p>
                       {obs.reported_concerns && obs.reported_concerns !== 'None' && (
@@ -1139,6 +1295,69 @@ export default function FarmerProjectDetail() {
                       <div className="flex items-center justify-between pt-1">
                         <span className="text-slate-400">Sale Status:</span>
                         <span className="font-bold text-[#174D32] uppercase text-[11px]">{ph.sale_status_display || ph.sale_status}</span>
+                      </div>
+
+                      {/* Post-Harvest Marketplace Actions */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {!ph.transport_request_id && !ph.transport_service_request && (
+                            <button
+                              type="button"
+                              onClick={() => handleRequestPostHarvestService(ph.id, 'transportation')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition cursor-pointer"
+                              title="Create transportation service request in Marketplace"
+                            >
+                              <Truck className="w-3.5 h-3.5 text-[#174D32]" />
+                              <span>{lang === 'hi' ? 'परिवहन मांगें' : 'Book Transport'}</span>
+                            </button>
+                          )}
+                          {(ph.transport_request_id || ph.transport_service_request) && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+                              Transport Req #{ph.transport_request_id || ph.transport_service_request}
+                            </span>
+                          )}
+
+                          {!ph.storage_request_id && !ph.storage_service_request && (
+                            <button
+                              type="button"
+                              onClick={() => handleRequestPostHarvestService(ph.id, 'storage')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition cursor-pointer"
+                              title="Create warehouse/storage service request in Marketplace"
+                            >
+                              <Warehouse className="w-3.5 h-3.5 text-[#174D32]" />
+                              <span>{lang === 'hi' ? 'भंडारण मांगें' : 'Book Storage'}</span>
+                            </button>
+                          )}
+                          {(ph.storage_request_id || ph.storage_service_request) && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-bold">
+                              Storage Req #{ph.storage_request_id || ph.storage_service_request}
+                            </span>
+                          )}
+                        </div>
+
+                        {ph.sale_status !== 'sold' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPhForRevenue(ph);
+                              setRevenueForm(prev => ({
+                                ...prev,
+                                quantity_quintals: ph.produce_quantity || '',
+                                rate_per_quintal: ''
+                              }));
+                              setShowRevenueModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-[11px] font-bold transition cursor-pointer"
+                          >
+                            <IndianRupee className="w-3 h-3 text-[#E8B44C]" />
+                            <span>{lang === 'hi' ? 'बिक्री दर्ज करें' : 'Record Sale'}</span>
+                          </button>
+                        )}
+                        {ph.sale_status === 'sold' && (ph.revenue_amount || ph.revenue_record) && (
+                          <span className="text-[11px] font-bold text-emerald-700">
+                            Sold: ₹{Number(ph.revenue_amount || 0).toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1233,6 +1452,24 @@ export default function FarmerProjectDetail() {
             </div>
 
             <form onSubmit={handleAddSeed} className="p-6 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'संबंधित कार्य (Operation)' : 'Linked Project Operation'}
+                </label>
+                <select
+                  value={seedForm.operation || ''}
+                  onChange={(e) => setSeedForm({ ...seedForm, operation: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                >
+                  <option value="">-- {lang === 'hi' ? 'सामान्य बीज खरीद' : 'General Project Seed Requirement'} --</option>
+                  {(project.project_operations || []).map((op) => (
+                    <option key={op.id} value={op.id}>
+                      #{op.sequence_order} {op.operation_name_en} ({op.stage})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Variety *</label>
                 <input
@@ -1360,6 +1597,22 @@ export default function FarmerProjectDetail() {
             </div>
 
             <form onSubmit={handleAddObservation} className="p-6 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'संबंधित कार्य (Operation)' : 'Linked Operation (Optional)'}
+                </label>
+                <select
+                  value={obsForm.operation || ''}
+                  onChange={(e) => setObsForm({ ...obsForm, operation: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                >
+                  <option value="">-- {lang === 'hi' ? 'सामान्य खेत निरीक्षण' : 'General Field Observation'} --</option>
+                  {(project.project_operations || []).map((op) => (
+                    <option key={op.id} value={op.id}>#{op.sequence_order} {op.operation_name_en} ({op.stage})</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Growth Stage *</label>
                 <input
@@ -1540,6 +1793,138 @@ export default function FarmerProjectDetail() {
                   className="px-5 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold transition disabled:opacity-50"
                 >
                   {submittingModal ? 'Saving...' : 'Save Harvest Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Record Sale & Revenue (Module 10 / FIN-12) */}
+      {showRevenueModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-6 bg-[#174D32] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">
+                  {lang === 'hi' ? 'फसल बिक्री व राजस्व दर्ज करें' : 'Record Crop Sale & Revenue'}
+                </h3>
+                <p className="text-xs text-emerald-100 mt-0.5">FIN-12 • Post-Harvest Realized Revenue</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowRevenueModal(false);
+                  setSelectedPhForRevenue(null);
+                }}
+                className="p-2 text-white/80 hover:text-white rounded-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRevenue} className="p-6 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'बिक्री मात्रा (क्विंटल) *' : 'Quantity (Quintals) *'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={revenueForm.quantity_quintals}
+                    onChange={(e) => setRevenueForm({ ...revenueForm, quantity_quintals: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'दर प्रति क्विंटल (₹) *' : 'Rate / Quintal (₹) *'}
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={revenueForm.rate_per_quintal}
+                    onChange={(e) => setRevenueForm({ ...revenueForm, rate_per_quintal: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                    placeholder="e.g. 2275"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Calculated Total Revenue preview */}
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-900">
+                  {lang === 'hi' ? 'कुल अनुमानित राजस्व:' : 'Total Realized Revenue:'}
+                </span>
+                <span className="text-base font-black text-[#174D32]">
+                  ₹{(
+                    (parseFloat(revenueForm.quantity_quintals) || 0) *
+                    (parseFloat(revenueForm.rate_per_quintal) || 0)
+                  ).toLocaleString()}
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'खरीदार / एजेंसी का नाम *' : 'Buyer / Agency Name *'}
+                </label>
+                <input
+                  type="text"
+                  value={revenueForm.buyer_name}
+                  onChange={(e) => setRevenueForm({ ...revenueForm, buyer_name: e.target.value })}
+                  placeholder="e.g. ITC e-Choupal / Meerut Grain Merchant"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'मंडी या मिल का नाम' : 'Mandi or Processing Mill'}
+                </label>
+                <input
+                  type="text"
+                  value={revenueForm.mandi_or_mill}
+                  onChange={(e) => setRevenueForm({ ...revenueForm, mandi_or_mill: e.target.value })}
+                  placeholder="e.g. Daurala Mandi Yard"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'बिक्री तारीख *' : 'Sale Date *'}
+                </label>
+                <input
+                  type="date"
+                  value={revenueForm.sale_date}
+                  onChange={(e) => setRevenueForm({ ...revenueForm, sale_date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRevenueModal(false);
+                    setSelectedPhForRevenue(null);
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700"
+                >
+                  {lang === 'hi' ? 'रद्द करें' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingModal}
+                  className="px-5 py-2 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition disabled:opacity-50"
+                >
+                  {submittingModal ? 'Saving...' : (lang === 'hi' ? 'राजस्व सहेजें' : 'Save Revenue')}
                 </button>
               </div>
             </form>

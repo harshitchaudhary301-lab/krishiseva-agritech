@@ -13,9 +13,16 @@ class FieldSerializer(serializers.ModelSerializer):
         model = Field
         fields = [
             'id', 'farm', 'name', 'khasra_number', 'area_acres',
-            'soil_type', 'irrigation_status', 'latitude', 'longitude', 'created_at'
+            'original_area_value', 'original_area_unit', 'land_tenure',
+            'soil_type', 'irrigation_status', 'history_notes',
+            'latitude', 'longitude', 'created_at'
         ]
         read_only_fields = ['created_at']
+
+    def validate_area_acres(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Field area must be a positive number greater than zero.")
+        return value
 
 
 class FarmSerializer(serializers.ModelSerializer):
@@ -30,6 +37,11 @@ class FarmSerializer(serializers.ModelSerializer):
             'history_notes', 'fields', 'created_at'
         ]
         read_only_fields = ['farmer', 'created_at']
+
+    def validate_size_acres(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Farm size must be a positive number greater than zero.")
+        return value
 
 
 class CropOperationTemplateSerializer(serializers.ModelSerializer):
@@ -54,6 +66,7 @@ class CropTemplateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'slug', 'crop_name_en', 'crop_name_hi', 'variant_name_en',
             'variant_name_hi', 'season', 'typical_duration_days', 'version',
+            'source_institution', 'source_url',
             'description_en', 'description_hi', 'operations_count', 'operations', 'is_active'
         ]
 
@@ -222,11 +235,11 @@ class SoilReportSerializer(serializers.ModelSerializer):
     farmer_name = serializers.CharField(source='farmer.get_full_name', read_only=True)
     farm_name = serializers.CharField(source='farm.name', read_only=True)
     field_name = serializers.CharField(source='field.name', read_only=True)
-    electrical_conductivity = serializers.DecimalField(source='ec', max_digits=5, decimal_places=2, read_only=True)
-    organic_carbon_percentage = serializers.DecimalField(source='organic_carbon_percent', max_digits=4, decimal_places=2, read_only=True)
-    nitrogen_kg_per_ha = serializers.DecimalField(source='nitrogen_kg_ha', max_digits=6, decimal_places=2, read_only=True)
-    phosphorus_kg_per_ha = serializers.DecimalField(source='phosphorus_kg_ha', max_digits=6, decimal_places=2, read_only=True)
-    potassium_kg_per_ha = serializers.DecimalField(source='potassium_kg_ha', max_digits=6, decimal_places=2, read_only=True)
+    electrical_conductivity = serializers.DecimalField(source='ec', max_digits=5, decimal_places=2, required=False, allow_null=True)
+    organic_carbon_percentage = serializers.DecimalField(source='organic_carbon_percent', max_digits=4, decimal_places=2, required=False, allow_null=True)
+    nitrogen_kg_per_ha = serializers.DecimalField(source='nitrogen_kg_ha', max_digits=6, decimal_places=2, required=False, allow_null=True)
+    phosphorus_kg_per_ha = serializers.DecimalField(source='phosphorus_kg_ha', max_digits=6, decimal_places=2, required=False, allow_null=True)
+    potassium_kg_per_ha = serializers.DecimalField(source='potassium_kg_ha', max_digits=6, decimal_places=2, required=False, allow_null=True)
 
     class Meta:
         model = SoilReport
@@ -241,6 +254,35 @@ class SoilReportSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['farmer', 'farm', 'created_at']
 
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'electrical_conductivity' in data and not data.get('ec'):
+            data['ec'] = data['electrical_conductivity']
+        if 'organic_carbon_percentage' in data and not data.get('organic_carbon_percent'):
+            data['organic_carbon_percent'] = data['organic_carbon_percentage']
+        if 'nitrogen_kg_per_ha' in data and not data.get('nitrogen_kg_ha'):
+            data['nitrogen_kg_ha'] = data['nitrogen_kg_per_ha']
+        if 'phosphorus_kg_per_ha' in data and not data.get('phosphorus_kg_ha'):
+            data['phosphorus_kg_ha'] = data['phosphorus_kg_per_ha']
+        if 'potassium_kg_per_ha' in data and not data.get('potassium_kg_ha'):
+            data['potassium_kg_ha'] = data['potassium_kg_per_ha']
+        return super().to_internal_value(data)
+
+    def validate_ph(self, value):
+        if value is not None and (value < 0 or value > 14):
+            raise serializers.ValidationError("pH value must be between 0.0 and 14.0.")
+        return value
+
+    def validate_ec(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Electrical conductivity cannot be negative.")
+        return value
+
+    def validate_organic_carbon_percent(self, value):
+        if value is not None and (value < 0 or value > 100):
+            raise serializers.ValidationError("Organic carbon percentage must be between 0% and 100%.")
+        return value
+
 
 class SeedProcurementRecordSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)
@@ -248,29 +290,42 @@ class SeedProcurementRecordSerializer(serializers.ModelSerializer):
     variety = serializers.CharField(source='variety_name', read_only=True)
     breeder_source = serializers.CharField(source='source_breeder', read_only=True)
     unit = serializers.CharField(source='quantity_unit', read_only=True)
+    operation_name = serializers.CharField(source='operation.operation_name_en', read_only=True)
+    expense_amount = serializers.DecimalField(source='expense.amount', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = SeedProcurementRecord
         fields = [
-            'id', 'project', 'project_name', 'crop', 'variety_name', 'source_breeder',
-            'variety', 'breeder_source', 'unit',
+            'id', 'project', 'project_name', 'operation', 'operation_name', 'crop',
+            'variety_name', 'source_breeder', 'variety', 'breeder_source', 'unit',
             'required_quantity', 'quantity_unit', 'procurement_status', 'status_display',
             'supplier_name', 'purchase_date', 'lot_number', 'recorded_cost',
-            'notes', 'created_at'
+            'expense', 'expense_amount', 'notes', 'created_at'
         ]
-        read_only_fields = ['project', 'created_at']
+        read_only_fields = ['project', 'expense', 'created_at']
+
+    def validate_required_quantity(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Required seed quantity must be greater than zero.")
+        return value
+
+    def validate_recorded_cost(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Recorded seed cost cannot be negative.")
+        return value
 
 
 class CropObservationSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)
     operation_name = serializers.CharField(source='operation.operation_name_en', read_only=True)
+    field_name = serializers.CharField(source='field.name', read_only=True)
     condition_display = serializers.CharField(source='get_crop_condition_display', read_only=True)
     follow_up_display = serializers.CharField(source='get_follow_up_status_display', read_only=True)
 
     class Meta:
         model = CropObservation
         fields = [
-            'id', 'project', 'project_name', 'operation', 'operation_name',
+            'id', 'project', 'project_name', 'field', 'field_name', 'operation', 'operation_name',
             'observation_date', 'growth_stage', 'crop_condition', 'condition_display',
             'field_notes', 'reported_concerns', 'follow_up_status', 'follow_up_display',
             'photo_reference', 'created_at'
@@ -286,6 +341,9 @@ class PostHarvestRecordSerializer(serializers.ModelSerializer):
     storage_days = serializers.IntegerField(source='storage_duration_days', read_only=True)
     storage_cost = serializers.DecimalField(source='storage_cost_inr', max_digits=10, decimal_places=2, read_only=True)
     transport_cost = serializers.DecimalField(source='transport_cost_inr', max_digits=10, decimal_places=2, read_only=True)
+    transport_request_id = serializers.IntegerField(source='transport_service_request.id', read_only=True)
+    storage_request_id = serializers.IntegerField(source='storage_service_request.id', read_only=True)
+    revenue_amount = serializers.DecimalField(source='revenue_record.total_realized_revenue', max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = PostHarvestRecord
@@ -296,7 +354,16 @@ class PostHarvestRecordSerializer(serializers.ModelSerializer):
             'storage_duration_days', 'storage_days',
             'storage_cost_inr', 'storage_cost',
             'transport_required', 'transport_cost_inr', 'transport_cost',
+            'transport_service_request', 'transport_request_id',
+            'storage_service_request', 'storage_request_id',
+            'storage_expense', 'transport_expense',
+            'revenue_record', 'revenue_amount',
             'sale_status', 'sale_status_display', 'notes', 'created_at'
         ]
         read_only_fields = ['project', 'created_at']
+
+    def validate_produce_quantity(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Produce harvest quantity must be greater than zero.")
+        return value
 

@@ -13,11 +13,21 @@ export default function FarmerAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchAnalytics = async () => {
+  // Filters for Farm Analytics (Batch D1)
+  const [selectedFarm, setSelectedFarm] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedSeason, setSelectedSeason] = useState('');
+
+  const fetchAnalytics = async (farm = selectedFarm, proj = selectedProject, ssn = selectedSeason) => {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get('/farm-projects/analytics/');
+      const params = new URLSearchParams();
+      if (farm) params.append('farm', farm);
+      if (proj) params.append('project', proj);
+      if (ssn) params.append('season', ssn);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const res = await api.get(`/farm-projects/analytics/${query}`);
       setData(res.data);
     } catch (err) {
       console.error(err);
@@ -29,7 +39,13 @@ export default function FarmerAnalytics() {
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [selectedFarm, selectedProject, selectedSeason]);
+
+  const handleResetFilters = () => {
+    setSelectedFarm('');
+    setSelectedProject('');
+    setSelectedSeason('');
+  };
 
   if (loading) {
     return (
@@ -75,6 +91,62 @@ export default function FarmerAnalytics() {
           <RefreshCw className="w-3.5 h-3.5" />
           <span>{lang === 'hi' ? 'ताज़ा करें' : 'Refresh Data'}</span>
         </button>
+      </div>
+
+      {/* Interactive Filters Bar (Batch D1) */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">{lang === 'hi' ? 'खेत:' : 'Farm:'}</span>
+            <select
+              value={selectedFarm}
+              onChange={(e) => setSelectedFarm(e.target.value)}
+              className="text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#84B547] outline-none"
+            >
+              <option value="">{lang === 'hi' ? 'सभी खेत (All Farms)' : 'All Farms'}</option>
+              {(data.filters?.farms || []).map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">{lang === 'hi' ? 'परियोजना:' : 'Project:'}</span>
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#84B547] outline-none"
+            >
+              <option value="">{lang === 'hi' ? 'सभी परियोजनाएं (All Projects)' : 'All Projects'}</option>
+              {(data.filters?.projects || []).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">{lang === 'hi' ? 'मौसम:' : 'Season:'}</span>
+            <select
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(e.target.value)}
+              className="text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#84B547] outline-none"
+            >
+              <option value="">{lang === 'hi' ? 'सभी मौसम (All Seasons)' : 'All Seasons'}</option>
+              {(data.filters?.seasons || ['rabi', 'kharif', 'zaid']).map(s => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {(selectedFarm || selectedProject || selectedSeason) && (
+          <button
+            onClick={handleResetFilters}
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+          >
+            {lang === 'hi' ? 'फ़िल्टर हटाएं' : 'Reset Filters'}
+          </button>
+        )}
       </div>
 
       {/* Overview Stat Cards */}
@@ -226,14 +298,14 @@ export default function FarmerAnalytics() {
                       <span className="text-[11px] text-slate-500">{p.crop}{p.variant ? ` (${p.variant})` : ''} · {p.target_area_acres} {lang === 'hi' ? 'एकड़' : 'Acres'}</span>
                     </div>
                     <span className="text-xs font-bold text-[#174D32] bg-[#F5F1E6] px-2.5 py-1 rounded-full">
-                      {p.progress_percentage !== null ? `${p.progress_percentage}%` : '0%'}
+                      {p.progress_percentage !== null && p.progress_percentage !== undefined ? `${p.progress_percentage}%` : 'N/A'}
                     </span>
                   </div>
                   {/* Progress Bar */}
                   <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                     <div
                       className="bg-[#84B547] h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, p.progress_percentage || 0)}%` }}
+                      style={{ width: `${p.progress_percentage !== null && p.progress_percentage !== undefined ? Math.min(100, p.progress_percentage) : 0}%` }}
                     />
                   </div>
                 </div>

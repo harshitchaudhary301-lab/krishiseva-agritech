@@ -38,8 +38,12 @@ class Field(models.Model):
     name = models.CharField(max_length=150, help_text="e.g. North Plot, Tubewell Khet, Khasra 402")
     khasra_number = models.CharField(max_length=100, blank=True, default='', help_text="Official parcel identifier / survey number")
     area_acres = models.DecimalField(max_digits=6, decimal_places=2, default=5.0)
+    original_area_value = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Original area value as entered by farmer")
+    original_area_unit = models.CharField(max_length=50, default='acre', help_text="Original measurement unit (Acre, Bigha, Hectare)")
+    land_tenure = models.CharField(max_length=50, choices=Farm.TENURE_CHOICES, blank=True, default='owned')
     soil_type = models.CharField(max_length=100, blank=True, default='Alluvial Loam')
     irrigation_status = models.CharField(max_length=100, blank=True, default='Tubewell Irrigated')
+    history_notes = models.TextField(blank=True, default='', help_text="Historical parcel notes")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -71,6 +75,8 @@ class CropTemplate(models.Model):
     ])
     typical_duration_days = models.IntegerField(default=120)
     version = models.CharField(max_length=20, default='v1.0')
+    source_institution = models.CharField(max_length=200, blank=True, default='', help_text="e.g. ICAR-IIWBR, ICAR-IIRR, ICAR-IISR")
+    source_url = models.URLField(max_length=300, blank=True, default='', help_text="Official institution reference link")
     description_en = models.TextField(blank=True)
     description_hi = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
@@ -570,6 +576,8 @@ class SeedProcurementRecord(models.Model):
     ]
 
     project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='seed_records')
+    operation = models.ForeignKey(ProjectOperation, on_delete=models.SET_NULL, null=True, blank=True, related_name='seed_records')
+    expense = models.OneToOneField(ExpenseRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='seed_procurement')
     crop = models.CharField(max_length=100)
     variety_name = models.CharField(max_length=150, help_text="e.g. HD-2967, PBW-343, Co-0238, Pusa Mustard 25")
     source_breeder = models.CharField(max_length=150, blank=True, help_text="e.g. ICAR-IIWBR, National Seeds Corp, State Seed Dept")
@@ -612,6 +620,7 @@ class CropObservation(models.Model):
     ]
 
     project = models.ForeignKey(FarmProject, on_delete=models.CASCADE, related_name='observations')
+    field = models.ForeignKey(Field, on_delete=models.SET_NULL, null=True, blank=True, related_name='crop_observations')
     operation = models.ForeignKey(ProjectOperation, on_delete=models.SET_NULL, null=True, blank=True, related_name='observations')
     observation_date = models.DateField(default=timezone.localdate)
     growth_stage = models.CharField(max_length=100, help_text="e.g. Crown Root Initiation, Tillering, Flowering, Grain Filling")
@@ -675,6 +684,11 @@ class PostHarvestRecord(models.Model):
     transport_required = models.BooleanField(default=False)
     transport_cost_inr = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     sale_status = models.CharField(max_length=30, choices=SALE_STATUS_CHOICES, default='unsold')
+    transport_service_request = models.ForeignKey('bookings.ServiceRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='transport_post_harvest')
+    storage_service_request = models.ForeignKey('bookings.ServiceRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='storage_post_harvest')
+    storage_expense = models.OneToOneField(ExpenseRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='storage_post_harvest')
+    transport_expense = models.OneToOneField(ExpenseRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='transport_post_harvest')
+    revenue_record = models.OneToOneField(RevenueRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='post_harvest_record')
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
