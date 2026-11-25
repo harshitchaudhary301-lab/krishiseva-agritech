@@ -4,7 +4,10 @@ from .views import (
     HistoricalMachineryRateListView, HistoricalAgriculturalWageListView,
     AgriculturalReferenceRecordListView,
     InstitutionalResourceListView,
-    WeatherForecastView
+    WeatherForecastView,
+    StateListView, DistrictListView, SubDistrictListView, DevelopmentBlockListView,
+    LocalBodyListView, WardListView, NationwideVillageListView, LocationSearchView,
+    LocationValidateView
 )
 
 urlpatterns = [
@@ -17,4 +20,15 @@ urlpatterns = [
     path('reference-data/records/', AgriculturalReferenceRecordListView.as_view(), name='agricultural-reference-records'),
     path('government-connect/', InstitutionalResourceListView.as_view(), name='government-connect'),
     path('weather/', WeatherForecastView.as_view(), name='weather-forecast'),
+
+    # Nationwide LGD Central Location Engine Endpoints
+    path('locations/states/', StateListView.as_view(), name='location-states'),
+    path('locations/districts/', DistrictListView.as_view(), name='location-districts'),
+    path('locations/subdistricts/', SubDistrictListView.as_view(), name='location-subdistricts'),
+    path('locations/blocks/', DevelopmentBlockListView.as_view(), name='location-blocks'),
+    path('locations/local-bodies/', LocalBodyListView.as_view(), name='location-local-bodies'),
+    path('locations/wards/', WardListView.as_view(), name='location-wards'),
+    path('locations/villages/', NationwideVillageListView.as_view(), name='location-villages'),
+    path('locations/search/', LocationSearchView.as_view(), name='location-search'),
+    path('locations/validate/', LocationValidateView.as_view(), name='location-validate'),
 ]

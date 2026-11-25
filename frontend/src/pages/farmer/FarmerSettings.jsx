@@ -3,6 +3,7 @@ import { Settings, User, Phone, MapPin, Globe, Sprout, CheckCircle2, Loader2, Al
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import NationwideLocationSelector from '../../components/NationwideLocationSelector';
 
 export default function FarmerSettings() {
   const { user, refreshProfile } = useAuth();
@@ -128,40 +129,22 @@ export default function FarmerSettings() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                {lang === 'hi' ? 'गाँव' : 'Village'}
-              </label>
-              <input
-                type="text"
-                value={formData.village}
-                onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none"
-              />
+          {/* Nationwide LGD Location Selector */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#174D32]" />
+                {lang === 'hi' ? 'निवास / फार्म स्थान (Pan-India Location)' : 'Base Location (Pan-India)'}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                LGD Integrated
+              </span>
             </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                {lang === 'hi' ? 'जिला' : 'District'}
-              </label>
-              <input
-                type="text"
-                value={formData.district}
-                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                {lang === 'hi' ? 'राज्य' : 'State'}
-              </label>
-              <input
-                type="text"
-                value={formData.state}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none"
-              />
-            </div>
+            <NationwideLocationSelector
+              value={formData}
+              onChange={(loc) => setFormData((prev) => ({ ...prev, ...loc }))}
+              compact
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">

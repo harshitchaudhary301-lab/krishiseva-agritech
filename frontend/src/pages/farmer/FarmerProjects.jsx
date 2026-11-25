@@ -207,7 +207,7 @@ export default function FarmerProjects() {
                   <div>
                     <span className="text-slate-500 block text-[10px] font-bold uppercase">{lang === 'hi' ? 'सेवाएं पक्की' : 'Services Ready'}</span>
                     <span className="font-bold text-emerald-800 text-sm">
-                      {proj.confirmed_count} of {proj.services_count} Confirmed
+                      {proj.confirmed_count ?? (proj.project_services?.filter(s => ['confirmed', 'scheduled', 'completed'].includes(s.booking_status)).length || 0)} of {proj.services_count ?? (proj.project_services?.length || 0)} Confirmed
                     </span>
                   </div>
                 </div>

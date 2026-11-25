@@ -6,6 +6,7 @@ import {
 import api from '../../api/client';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import NationwideLocationSelector from '../../components/NationwideLocationSelector';
 
 export default function FarmerFarms() {
   const { lang } = useLanguage();
@@ -290,54 +291,27 @@ export default function FarmerFarms() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      {lang === 'hi' ? 'गाँव *' : 'Village *'}
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.village}
-                      onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                      required
-                    />
+                {/* Pan-India Central Location Engine Selector */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#174D32]" />
+                      {lang === 'hi' ? 'खेत का प्रशासनिक स्थान (LGD Location)' : 'Farm Administrative Location (LGD)'}
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Pan-India Engine
+                    </span>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      {lang === 'hi' ? 'ब्लॉक (Block)' : 'Block'}
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.block}
-                      onChange={(e) => setFormData({ ...formData, block: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      {lang === 'hi' ? 'जिला *' : 'District *'}
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.district}
-                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      {lang === 'hi' ? 'राज्य *' : 'State *'}
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                      required
-                    />
-                  </div>
+                  <NationwideLocationSelector
+                    value={formData}
+                    onChange={(loc) => setFormData((prev) => ({
+                      ...prev,
+                      ...loc,
+                      lgd_code: loc.village_lgd_code || prev.lgd_code
+                    }))}
+                    showBlock
+                    required
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -609,15 +583,15 @@ export default function FarmerFarms() {
 
                     <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Organic Carbon</span>
-                      <span className="text-base font-black text-slate-900">{report.organic_carbon_percentage}%</span>
+                      <span className="text-base font-black text-slate-900">{report.organic_carbon_percent ?? report.organic_carbon_percentage}%</span>
                       <span className="text-[10px] text-amber-700 block mt-0.5">
-                        {report.organic_carbon_percentage >= 0.75 ? 'High' : report.organic_carbon_percentage >= 0.5 ? 'Medium' : 'Low'}
+                        {Number(report.organic_carbon_percent ?? report.organic_carbon_percentage) >= 0.75 ? 'High' : Number(report.organic_carbon_percent ?? report.organic_carbon_percentage) >= 0.5 ? 'Medium' : 'Low'}
                       </span>
                     </div>
 
                     <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">EC (Salinity)</span>
-                      <span className="text-base font-black text-slate-900">{report.electrical_conductivity}</span>
+                      <span className="text-base font-black text-slate-900">{report.ec ?? report.electrical_conductivity}</span>
                       <span className="text-[10px] text-slate-500 block mt-0.5">dS/m Normal</span>
                     </div>
                   </div>
@@ -630,15 +604,15 @@ export default function FarmerFarms() {
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <span className="text-slate-500 text-[10px] block">Nitrogen (N):</span>
-                        <strong className="text-slate-900">{report.nitrogen_kg_per_ha} kg/ha</strong>
+                        <strong className="text-slate-900">{report.nitrogen_kg_ha ?? report.nitrogen_kg_per_ha} kg/ha</strong>
                       </div>
                       <div>
                         <span className="text-slate-500 text-[10px] block">Phosphorus (P):</span>
-                        <strong className="text-slate-900">{report.phosphorus_kg_per_ha} kg/ha</strong>
+                        <strong className="text-slate-900">{report.phosphorus_kg_ha ?? report.phosphorus_kg_per_ha} kg/ha</strong>
                       </div>
                       <div>
                         <span className="text-slate-500 text-[10px] block">Potassium (K):</span>
-                        <strong className="text-slate-900">{report.potassium_kg_per_ha} kg/ha</strong>
+                        <strong className="text-slate-900">{report.potassium_kg_ha ?? report.potassium_kg_per_ha} kg/ha</strong>
                       </div>
                     </div>
                   </div>

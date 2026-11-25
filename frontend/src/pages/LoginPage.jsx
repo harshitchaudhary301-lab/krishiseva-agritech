@@ -20,6 +20,7 @@ export default function LoginPage() {
     if (role === 'farmer') navigate('/farmer/overview');
     else if (role === 'worker') navigate('/worker/dashboard');
     else if (role === 'provider') navigate('/provider/dashboard');
+    else if (role === 'admin') navigate('/admin-dashboard');
     else navigate('/farmer/overview');
   };
 
@@ -118,6 +119,14 @@ export default function LoginPage() {
             >
               <span>🚜 Baldev (Harvester)</span>
               {demoLoading === 'machinery' && <Loader2 className="w-3 h-3 animate-spin text-sky-700" />}
+            </button>
+            <button
+              onClick={() => handleDemo('admin')}
+              disabled={demoLoading !== null}
+              className="col-span-2 p-2 rounded-xl bg-white border border-amber-300 hover:border-[#174D32] font-bold text-[#174D32] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
+            >
+              <span>🛡️ Platform Admin (Compliance Desk)</span>
+              {demoLoading === 'admin' && <Loader2 className="w-3 h-3 animate-spin text-[#174D32]" />}
             </button>
           </div>
         </div>

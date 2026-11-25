@@ -4,7 +4,7 @@ import {
   Search, MapPin, Mic, MicOff, ArrowRight, CheckCircle2,
   Users, Wrench, Droplet, Tractor, Waves, Sprout, Truck,
   Building2, ShieldCheck, Calendar, Sparkles, ChevronRight,
-  HelpCircle, Star, AlertCircle, Play
+  HelpCircle, Star, AlertCircle, Play, X, ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ import api from '../api/client';
 import QuickDemoModal from '../components/QuickDemoModal';
 import CreateRequestModal from '../components/CreateRequestModal';
 import CinematicIntro from '../components/CinematicIntro';
+import NationwideLocationSelector from '../components/NationwideLocationSelector';
 
 export default function LandingPage() {
   const { lang, t } = useLanguage();
@@ -21,6 +22,17 @@ export default function LandingPage() {
   const [categories, setCategories] = useState([]);
   const [villages, setVillages] = useState([]);
   const [selectedVillage, setSelectedVillage] = useState('Daurala');
+  const [selectedLocation, setSelectedLocation] = useState({
+    state: 'Uttar Pradesh',
+    state_id: 35,
+    district: 'Meerut',
+    district_id: 720,
+    subdistrict: 'Sardhana',
+    subdistrict_id: 692,
+    village: 'Daurala',
+    is_unverified: false
+  });
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [demoModalOpen, setDemoModalOpen] = useState(false);
   const [createReqOpen, setCreateReqOpen] = useState(false);
@@ -157,28 +169,24 @@ export default function LandingPage() {
 
               {/* Search & Location Bar */}
               <div className="bg-white p-2.5 sm:p-3 rounded-2xl shadow-xl shadow-emerald-950/5 border border-slate-200/90 max-w-xl mx-auto lg:mx-0 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2">
-                {/* Village Selector */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 shrink-0">
-                  <MapPin className="w-4 h-4 text-[#174D32]" />
-                  <select
-                    value={selectedVillage}
-                    onChange={(e) => setSelectedVillage(e.target.value)}
-                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-                  >
-                    {villages.map((v) => (
-                      <option key={v.id} value={v.name}>
-                        {v.name}, {v.district}
-                      </option>
-                    ))}
-                    {villages.length === 0 && (
-                      <>
-                        <option value="Daurala">Daurala, Meerut</option>
-                        <option value="Sardhana">Sardhana, Meerut</option>
-                        <option value="Mawana">Mawana, Meerut</option>
-                      </>
-                    )}
-                  </select>
-                </div>
+                {/* Pan-India Location Selector Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setShowLocationModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50/90 hover:bg-emerald-100 rounded-xl border border-emerald-200/90 shrink-0 text-left transition cursor-pointer"
+                  title="Click to select nationwide location"
+                >
+                  <MapPin className="w-4 h-4 text-[#174D32] shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-emerald-800 font-extrabold uppercase leading-none">
+                      {selectedLocation.district || 'India'}
+                    </span>
+                    <span className="text-xs font-bold text-slate-800 truncate max-w-[130px]">
+                      {selectedLocation.village || 'Select Village'}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                </button>
 
                 {/* Search Input */}
                 <div className="flex-1 flex items-center px-2">
@@ -618,6 +626,60 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Nationwide Location Selection Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-[#174D32]">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">
+                    {lang === 'hi' ? 'स्थान चुनें (Pan-India Central Location Engine)' : 'Select Location (Pan-India)'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {lang === 'hi' ? '6.6 लाख+ आधिकारिक LGD गाँवों और सभी 36 राज्यों/केंद्र शासित प्रदेशों में खोजें' : 'Search across 662k+ official LGD villages & all 36 States/UTs'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <NationwideLocationSelector
+              value={selectedLocation}
+              onChange={(loc) => {
+                setSelectedLocation(loc);
+                if (loc.village) setSelectedVillage(loc.village);
+              }}
+              showBlock
+            />
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <span className="text-xs text-slate-500 font-medium">
+                {selectedLocation.village
+                  ? `${selectedLocation.village}, ${selectedLocation.district}, ${selectedLocation.state}`
+                  : 'Select a location'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="px-5 py-2 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition cursor-pointer"
+              >
+                {lang === 'hi' ? 'स्थान लागू करें' : 'Apply Location'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <QuickDemoModal

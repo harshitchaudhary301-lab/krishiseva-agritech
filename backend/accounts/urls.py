@@ -11,5 +11,6 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('admin/verification/', AdminVerificationView.as_view(), name='admin-verification'),
     path('admin/verification-logs/', AdminVerificationLogsView.as_view(), name='admin-verification-logs'),
+    path('admin/verification/logs/', AdminVerificationLogsView.as_view(), name='admin-verification-logs-alias'),
     path('admin/users/', AdminUserListView.as_view(), name='admin-users'),
 ]

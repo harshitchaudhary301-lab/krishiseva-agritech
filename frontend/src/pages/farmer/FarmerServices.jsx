@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Wrench, Droplet, Tractor, Waves, Sprout, Truck,
-  Building2, Search, MapPin, Star, Plus, ShieldCheck, ArrowRight, Loader2
+  Building2, Search, MapPin, Star, Plus, ShieldCheck, ArrowRight, Loader2, Info, X
 } from 'lucide-react';
 import api from '../../api/client';
 import { useLanguage } from '../../context/LanguageContext';
 import CreateRequestModal from '../../components/CreateRequestModal';
+import NationwideLocationSelector from '../../components/NationwideLocationSelector';
 
 export default function FarmerServices() {
   const { lang, t } = useLanguage();
@@ -15,6 +16,27 @@ export default function FarmerServices() {
   const [activeTab, setActiveTab] = useState('categories'); // 'categories' or 'providers'
   const [createReqOpen, setCreateReqOpen] = useState(false);
   const [selectedCategorySlug, setSelectedCategorySlug] = useState(null);
+  const [locationFilter, setLocationFilter] = useState({
+    state: '',
+    district: '',
+    subdistrict: '',
+    village: ''
+  });
+
+  const fetchProviders = async (loc = locationFilter) => {
+    let params = [];
+    if (loc.village) params.push(`village=${encodeURIComponent(loc.village)}`);
+    if (loc.district) params.push(`district=${encodeURIComponent(loc.district)}`);
+    if (loc.state) params.push(`state=${encodeURIComponent(loc.state)}`);
+
+    try {
+      const url = params.length > 0 ? `/services/providers/?${params.join('&')}` : '/services/providers/';
+      const provRes = await api.get(url);
+      setProviders(provRes.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -159,12 +181,68 @@ export default function FarmerServices() {
         </div>
       ) : (
         /* Provider Directory */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {providers.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-xs text-slate-500">
-              No registered providers found.
+        <div className="space-y-6">
+          {/* Pan-India Location Filter Card */}
+          <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#174D32]" />
+                <span className="text-xs font-bold text-slate-900">
+                  {lang === 'hi' ? 'स्थान अनुसार प्रदाता खोजें (Pan-India Location Engine)' : 'Filter Providers Nationwide (LGD Engine)'}
+                </span>
+              </div>
+              {(locationFilter.state || locationFilter.district || locationFilter.village) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const empty = { state: '', district: '', subdistrict: '', village: '' };
+                    setLocationFilter(empty);
+                    fetchProviders(empty);
+                  }}
+                  className="text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>{lang === 'hi' ? 'फ़िल्टर हटाएं (सभी देखें)' : 'Clear Filter (Show All)'}</span>
+                </button>
+              )}
             </div>
-          ) : (
+
+            <NationwideLocationSelector
+              value={locationFilter}
+              onChange={(loc) => {
+                setLocationFilter(loc);
+                fetchProviders(loc);
+              }}
+              compact
+            />
+
+            {/* Nationwide Coverage vs Provider Density Clarification Notice */}
+            <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-900">
+              <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <span>
+                {lang === 'hi'
+                  ? 'सूचना: सम्पूर्ण भारत के सभी 36 राज्यों/केंद्र शासित प्रदेशों के 6.6 लाख+ गाँवों में सेवा अनुरोध दर्ज किए जा सकते हैं। वर्तमान में तुरंत उपलब्ध ऑन-ग्राउंड सत्यापित मैकेनिक व श्रमिक दल मेरठ क्लस्टर में केंद्रित हैं।'
+                  : 'Notice: Nationwide location coverage is active across all 36 States/UTs (662k+ villages). Registered on-ground active providers are currently concentrated in the launch cluster (Meerut baseline).'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {providers.length === 0 ? (
+              <div className="col-span-full py-16 text-center text-xs text-slate-500 bg-white rounded-3xl border border-slate-200 p-8 space-y-2">
+                <MapPin className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="font-semibold text-slate-700">
+                  {lang === 'hi'
+                    ? 'इस चयनित क्षेत्र में कोई पंजीकृत प्रदाता नहीं मिला।'
+                    : 'No registered providers found in this selected location.'}
+                </p>
+                <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                  {lang === 'hi'
+                    ? 'आप फिर भी अपना सेवा अनुरोध दर्ज कर सकते हैं, हमारी टीम प्रदाता नेटवर्क का विस्तार करेगी।'
+                    : 'You can still post a service request; providers serving neighboring areas or our expansion team will be alerted.'}
+                </p>
+              </div>
+            ) : (
             providers.map((p) => {
               const isWorker = p.role === 'worker';
               const rating = isWorker ? p.worker_profile?.rating : p.provider_profile?.rating;
@@ -225,7 +303,8 @@ export default function FarmerServices() {
             })
           )}
         </div>
-      )}
+      </div>
+    )}
 
       <CreateRequestModal
         isOpen={createReqOpen}

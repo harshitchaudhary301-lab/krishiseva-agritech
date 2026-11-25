@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     ServiceCategory, Village, ProviderService, Review,
     AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage,
-    InstitutionalResource
+    InstitutionalResource, State, District, SubDistrict, DevelopmentBlock, LocalBody, Ward
 )
 from accounts.serializers import UserSerializer
 
@@ -16,10 +16,74 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
         ]
 
 
+class StateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = State
+        fields = ['id', 'lgd_code', 'name_en', 'name_local', 'state_or_ut']
+
+
+class DistrictSerializer(serializers.ModelSerializer):
+    state_name = serializers.CharField(source='state.name_en', read_only=True)
+
+    class Meta:
+        model = District
+        fields = ['id', 'lgd_code', 'name_en', 'name_local', 'state', 'state_name']
+
+
+class SubDistrictSerializer(serializers.ModelSerializer):
+    district_name = serializers.CharField(source='district.name_en', read_only=True)
+    state_id = serializers.IntegerField(source='district.state_id', read_only=True)
+    state_name = serializers.CharField(source='district.state.name_en', read_only=True)
+
+    class Meta:
+        model = SubDistrict
+        fields = ['id', 'lgd_code', 'name_en', 'name_local', 'district', 'district_name', 'state_id', 'state_name']
+
+
+class DevelopmentBlockSerializer(serializers.ModelSerializer):
+    district_name = serializers.CharField(source='district.name_en', read_only=True)
+
+    class Meta:
+        model = DevelopmentBlock
+        fields = ['id', 'lgd_code', 'name_en', 'name_local', 'district', 'district_name']
+
+
+class LocalBodySerializer(serializers.ModelSerializer):
+    district_name = serializers.CharField(source='district.name_en', read_only=True)
+    state_name = serializers.CharField(source='state.name_en', read_only=True)
+
+    class Meta:
+        model = LocalBody
+        fields = [
+            'id', 'lgd_code', 'name_en', 'name_local',
+            'local_body_type', 'local_body_type_name',
+            'state', 'state_name', 'district', 'district_name',
+            'parent_local_body_code'
+        ]
+
+
+class WardSerializer(serializers.ModelSerializer):
+    local_body_name = serializers.CharField(source='local_body.name_en', read_only=True)
+
+    class Meta:
+        model = Ward
+        fields = ['id', 'ward_code', 'ward_number', 'ward_name', 'local_body', 'local_body_name']
+
+
 class VillageSerializer(serializers.ModelSerializer):
+    subdistrict_name = serializers.CharField(source='subdistrict.name_en', default='', read_only=True)
+    district_name = serializers.CharField(source='district_ref.name_en', default='', read_only=True)
+    state_name = serializers.CharField(source='state_ref.name_en', default='', read_only=True)
+
     class Meta:
         model = Village
-        fields = ['id', 'name', 'district', 'state', 'pincode']
+        fields = [
+            'id', 'name', 'name_local', 'lgd_code',
+            'subdistrict', 'subdistrict_name',
+            'district_ref', 'district_name', 'district',
+            'state_ref', 'state_name', 'state',
+            'pincode', 'latitude', 'longitude', 'village_status'
+        ]
 
 
 class ProviderServiceSerializer(serializers.ModelSerializer):

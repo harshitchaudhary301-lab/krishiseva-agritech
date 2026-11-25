@@ -223,7 +223,7 @@ export default function FarmerAnalytics() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">{p.name}</h4>
-                      <span className="text-[11px] text-slate-500">{p.crop} ({p.variant}) · {p.target_area_acres} {lang === 'hi' ? 'एकड़' : 'Acres'}</span>
+                      <span className="text-[11px] text-slate-500">{p.crop}{p.variant ? ` (${p.variant})` : ''} · {p.target_area_acres} {lang === 'hi' ? 'एकड़' : 'Acres'}</span>
                     </div>
                     <span className="text-xs font-bold text-[#174D32] bg-[#F5F1E6] px-2.5 py-1 rounded-full">
                       {p.progress_percentage !== null ? `${p.progress_percentage}%` : '0%'}

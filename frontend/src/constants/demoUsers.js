@@ -31,7 +31,7 @@ export const DEMO_USERS = {
   },
   admin: {
     username: 'admin',
-    password: 'adminpassword123',
+    password: 'admin123',
     label: 'Platform Administrator (Compliance & Governance)',
     role: 'admin'
   }

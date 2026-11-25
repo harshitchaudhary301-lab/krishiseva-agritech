@@ -2,20 +2,232 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+
+class DatasetVersion(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    source_url = models.CharField(max_length=500)
+    download_date = models.DateField(default=timezone.localdate)
+    dataset_version = models.CharField(max_length=50, default='LGD-2026-V1')
+    licence = models.CharField(max_length=200, default='Government Open Data License – India')
+    file_hash = models.CharField(max_length=100, blank=True)
+    records_count = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.dataset_version})"
+
+
+class State(models.Model):
+    lgd_code = models.IntegerField(unique=True, db_index=True)
+    name_en = models.CharField(max_length=150, db_index=True)
+    name_local = models.CharField(max_length=150, blank=True)
+    state_or_ut = models.CharField(max_length=10, default='State') # 'State' or 'UT'
+    census_2001_code = models.CharField(max_length=20, blank=True)
+    census_2011_code = models.CharField(max_length=20, blank=True)
+    version = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['name_en']
+        indexes = [
+            models.Index(fields=['name_en']),
+            models.Index(fields=['lgd_code']),
+        ]
+
+    def __str__(self):
+        return self.name_en
+
+
+class District(models.Model):
+    lgd_code = models.IntegerField(unique=True, db_index=True)
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='districts')
+    name_en = models.CharField(max_length=150, db_index=True)
+    name_local = models.CharField(max_length=150, blank=True)
+    census_2001_code = models.CharField(max_length=20, blank=True)
+    census_2011_code = models.CharField(max_length=20, blank=True)
+    version = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['name_en']
+        indexes = [
+            models.Index(fields=['state', 'name_en']),
+            models.Index(fields=['lgd_code']),
+        ]
+
+    def __str__(self):
+        return f"{self.name_en}, {self.state.name_en}"
+
+
+class SubDistrict(models.Model):
+    """
+    Sub-district / Tehsil / Taluka / Mandal / Circle (Revenue hierarchy)
+    """
+    lgd_code = models.IntegerField(unique=True, db_index=True)
+    district = models.ForeignKey(District, on_delete=models.CASCADE, related_name='subdistricts')
+    name_en = models.CharField(max_length=150, db_index=True)
+    name_local = models.CharField(max_length=150, blank=True)
+    census_2001_code = models.CharField(max_length=20, blank=True)
+    census_2011_code = models.CharField(max_length=20, blank=True)
+    version = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['name_en']
+        indexes = [
+            models.Index(fields=['district', 'name_en']),
+            models.Index(fields=['lgd_code']),
+        ]
+
+    def __str__(self):
+        return f"{self.name_en}, {self.district.name_en}"
+
+
+class DevelopmentBlock(models.Model):
+    """
+    Rural Development Block (Administrative / Planning hierarchy)
+    """
+    lgd_code = models.IntegerField(unique=True, db_index=True)
+    district = models.ForeignKey(District, on_delete=models.CASCADE, related_name='blocks')
+    name_en = models.CharField(max_length=150, db_index=True)
+    name_local = models.CharField(max_length=150, blank=True)
+    version = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['name_en']
+        indexes = [
+            models.Index(fields=['district', 'name_en']),
+            models.Index(fields=['lgd_code']),
+        ]
+
+    def __str__(self):
+        return f"{self.name_en} Block, {self.district.name_en}"
+
+
+class LocalBody(models.Model):
+    """
+    Local Government hierarchy:
+    Rural (Panchayati Raj): District Panchayat, Intermediate/Block Panchayat, Village Panchayat (Gram Panchayat)
+    Urban: Municipal Corporation, Municipality, Town Panchayat / Nagar Panchayat
+    Traditional: Traditional Local Body (TLB)
+    """
+    LOCAL_BODY_CATEGORIES = [
+        ('urban', 'Urban Local Body'),
+        ('rural', 'Rural Local Body (PRI)'),
+        ('traditional', 'Traditional Local Body'),
+    ]
+
+    lgd_code = models.IntegerField(unique=True, db_index=True)
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='local_bodies')
+    district = models.ForeignKey(District, on_delete=models.SET_NULL, null=True, blank=True, related_name='local_bodies')
+    name_en = models.CharField(max_length=200, db_index=True)
+    name_local = models.CharField(max_length=200, blank=True)
+    local_body_type = models.CharField(max_length=30, choices=LOCAL_BODY_CATEGORIES, default='rural')
+    local_body_type_code = models.IntegerField(null=True, blank=True)
+    local_body_type_name = models.CharField(max_length=150, blank=True)
+    parent_local_body_code = models.IntegerField(null=True, blank=True)
+    census_2011_code = models.CharField(max_length=30, blank=True)
+    version = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['name_en']
+        indexes = [
+            models.Index(fields=['state', 'local_body_type']),
+            models.Index(fields=['district', 'local_body_type']),
+            models.Index(fields=['lgd_code']),
+        ]
+
+    def __str__(self):
+        return f"{self.name_en} ({self.local_body_type_name or self.local_body_type})"
+
+
+class Ward(models.Model):
+    """
+    Constituent wards within Urban and Rural Local Bodies
+    """
+    ward_code = models.CharField(max_length=60, unique=True, db_index=True)
+    local_body = models.ForeignKey(LocalBody, on_delete=models.CASCADE, related_name='wards')
+    ward_number = models.CharField(max_length=50)
+    ward_name = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['ward_number']
+        indexes = [
+            models.Index(fields=['local_body', 'ward_number']),
+        ]
+
+    def __str__(self):
+        return f"Ward {self.ward_number} - {self.local_body.name_en}"
+
+
 class Village(models.Model):
-    name = models.CharField(max_length=100)
-    district = models.CharField(max_length=100)
-    state = models.CharField(max_length=100, default='Uttar Pradesh')
+    name = models.CharField(max_length=150, db_index=True)
+    name_local = models.CharField(max_length=150, blank=True)
+    lgd_code = models.IntegerField(unique=True, null=True, blank=True, db_index=True)
+    subdistrict = models.ForeignKey(SubDistrict, on_delete=models.SET_NULL, null=True, blank=True, related_name='villages')
+    district_ref = models.ForeignKey(District, on_delete=models.SET_NULL, null=True, blank=True, related_name='villages')
+    state_ref = models.ForeignKey(State, on_delete=models.SET_NULL, null=True, blank=True, related_name='villages')
+    district = models.CharField(max_length=150, db_index=True)
+    state = models.CharField(max_length=150, default='Uttar Pradesh', db_index=True)
     pincode = models.CharField(max_length=10, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    village_status = models.CharField(max_length=50, default='Inhabitant')
+    census_2001_code = models.CharField(max_length=30, blank=True)
+    census_2011_code = models.CharField(max_length=30, blank=True)
+    version = models.IntegerField(default=1)
 
     class Meta:
-        unique_together = ('name', 'district', 'state')
         ordering = ['district', 'name']
+        indexes = [
+            models.Index(fields=['state', 'district', 'name']),
+            models.Index(fields=['subdistrict', 'name']),
+            models.Index(fields=['lgd_code']),
+        ]
 
     def __str__(self):
         return f"{self.name}, {self.district}"
+
+
+class LocationMapping(models.Model):
+    """
+    Many-to-many village-to-panchayat, village-to-block, and ULB-to-village mappings
+    """
+    MAPPING_TYPES = [
+        ('village_block', 'Village to Development Block'),
+        ('village_gp', 'Village to Gram Panchayat'),
+        ('village_ulb', 'Village to Urban Local Body'),
+    ]
+
+    mapping_type = models.CharField(max_length=30, choices=MAPPING_TYPES)
+    village = models.ForeignKey(Village, on_delete=models.CASCADE, related_name='location_mappings')
+    development_block = models.ForeignKey(DevelopmentBlock, on_delete=models.CASCADE, null=True, blank=True, related_name='village_mappings')
+    local_body = models.ForeignKey(LocalBody, on_delete=models.CASCADE, null=True, blank=True, related_name='village_mappings')
+    is_verified = models.BooleanField(default=True)
+    source = models.CharField(max_length=100, default='LGD_OFFICIAL')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['mapping_type', 'village']),
+            models.Index(fields=['development_block']),
+            models.Index(fields=['local_body']),
+        ]
+
+    def __str__(self):
+        return f"{self.mapping_type} -> Village: {self.village.name}"
+
+
+class QuarantineLocationRecord(models.Model):
+    """
+    Quarantine conflicting records, unparseable lines, or invalid relationships for audit
+    """
+    source_file = models.CharField(max_length=150)
+    raw_data = models.JSONField()
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Quarantine [{self.source_file}]: {self.reason[:50]}"
 
 
 class ServiceCategory(models.Model):

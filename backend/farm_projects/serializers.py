@@ -182,6 +182,8 @@ class FarmProjectSerializer(serializers.ModelSerializer):
     progress_info = serializers.SerializerMethodField()
     completion_percentage = serializers.SerializerMethodField()
     financial_summary = serializers.SerializerMethodField()
+    services_count = serializers.SerializerMethodField()
+    confirmed_count = serializers.SerializerMethodField()
 
     class Meta:
         model = FarmProject
@@ -192,6 +194,7 @@ class FarmProjectSerializer(serializers.ModelSerializer):
             'expected_completion_date', 'status', 'estimated_budget',
             'actual_cost', 'notes', 'project_operations', 'project_services',
             'progress_info', 'completion_percentage', 'financial_summary',
+            'services_count', 'confirmed_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['farmer', 'status', 'estimated_budget', 'actual_cost', 'created_at', 'updated_at']
@@ -203,6 +206,14 @@ class FarmProjectSerializer(serializers.ModelSerializer):
         prog = obj.calculate_actual_progress()
         return prog.get('percentage')
 
+    def get_services_count(self, obj):
+        return obj.project_services.count()
+
+    def get_confirmed_count(self, obj):
+        return obj.project_services.filter(
+            service_request__status__in=['booked', 'confirmed', 'completed']
+        ).count()
+
     def get_financial_summary(self, obj):
         return obj.get_financial_summary()
 
@@ -211,6 +222,11 @@ class SoilReportSerializer(serializers.ModelSerializer):
     farmer_name = serializers.CharField(source='farmer.get_full_name', read_only=True)
     farm_name = serializers.CharField(source='farm.name', read_only=True)
     field_name = serializers.CharField(source='field.name', read_only=True)
+    electrical_conductivity = serializers.DecimalField(source='ec', max_digits=5, decimal_places=2, read_only=True)
+    organic_carbon_percentage = serializers.DecimalField(source='organic_carbon_percent', max_digits=4, decimal_places=2, read_only=True)
+    nitrogen_kg_per_ha = serializers.DecimalField(source='nitrogen_kg_ha', max_digits=6, decimal_places=2, read_only=True)
+    phosphorus_kg_per_ha = serializers.DecimalField(source='phosphorus_kg_ha', max_digits=6, decimal_places=2, read_only=True)
+    potassium_kg_per_ha = serializers.DecimalField(source='potassium_kg_ha', max_digits=6, decimal_places=2, read_only=True)
 
     class Meta:
         model = SoilReport
@@ -219,6 +235,8 @@ class SoilReportSerializer(serializers.ModelSerializer):
             'sampling_date', 'report_date', 'lab_name', 'sample_id', 'soil_texture',
             'ph', 'ec', 'organic_carbon_percent', 'nitrogen_kg_ha', 'phosphorus_kg_ha',
             'potassium_kg_ha', 'zinc_ppm', 'iron_ppm', 'document_reference', 'notes',
+            'electrical_conductivity', 'organic_carbon_percentage',
+            'nitrogen_kg_per_ha', 'phosphorus_kg_per_ha', 'potassium_kg_per_ha',
             'created_at'
         ]
         read_only_fields = ['farmer', 'farm', 'created_at']
@@ -227,11 +245,15 @@ class SoilReportSerializer(serializers.ModelSerializer):
 class SeedProcurementRecordSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)
     status_display = serializers.CharField(source='get_procurement_status_display', read_only=True)
+    variety = serializers.CharField(source='variety_name', read_only=True)
+    breeder_source = serializers.CharField(source='source_breeder', read_only=True)
+    unit = serializers.CharField(source='quantity_unit', read_only=True)
 
     class Meta:
         model = SeedProcurementRecord
         fields = [
             'id', 'project', 'project_name', 'crop', 'variety_name', 'source_breeder',
+            'variety', 'breeder_source', 'unit',
             'required_quantity', 'quantity_unit', 'procurement_status', 'status_display',
             'supplier_name', 'purchase_date', 'lot_number', 'recorded_cost',
             'notes', 'created_at'
@@ -259,14 +281,21 @@ class CropObservationSerializer(serializers.ModelSerializer):
 class PostHarvestRecordSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)
     sale_status_display = serializers.CharField(source='get_sale_status_display', read_only=True)
+    storage_type_display = serializers.CharField(source='get_storage_type_display', read_only=True)
+    unit = serializers.CharField(source='quantity_unit', read_only=True)
+    storage_days = serializers.IntegerField(source='storage_duration_days', read_only=True)
+    storage_cost = serializers.DecimalField(source='storage_cost_inr', max_digits=10, decimal_places=2, read_only=True)
+    transport_cost = serializers.DecimalField(source='transport_cost_inr', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = PostHarvestRecord
         fields = [
             'id', 'project', 'project_name', 'harvest_date', 'produce_quantity',
-            'quantity_unit', 'quality_grade', 'moisture_content_percent',
-            'storage_type', 'storage_location', 'storage_duration_days',
-            'storage_cost_inr', 'transport_required', 'transport_cost_inr',
+            'quantity_unit', 'unit', 'quality_grade', 'moisture_content_percent',
+            'storage_type', 'storage_type_display', 'storage_location',
+            'storage_duration_days', 'storage_days',
+            'storage_cost_inr', 'storage_cost',
+            'transport_required', 'transport_cost_inr', 'transport_cost',
             'sale_status', 'sale_status_display', 'notes', 'created_at'
         ]
         read_only_fields = ['project', 'created_at']

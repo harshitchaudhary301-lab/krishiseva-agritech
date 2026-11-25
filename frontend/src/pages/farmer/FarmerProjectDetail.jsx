@@ -280,7 +280,7 @@ export default function FarmerProjectDetail() {
               />
             </div>
             <div className="text-[11px] text-slate-500">
-              {project.confirmed_count} of {project.services_count} essential agricultural services confirmed.
+              {project.confirmed_count ?? (project.project_services?.filter(s => ['confirmed', 'scheduled', 'completed'].includes(s.booking_status)).length || 0)} of {project.services_count ?? (project.project_services?.length || 0)} essential agricultural services confirmed.
             </div>
           </div>
 
@@ -399,7 +399,7 @@ export default function FarmerProjectDetail() {
               </p>
             </div>
             <span className="text-[10px] text-slate-400 font-medium">
-              {project.confirmed_count} of {project.services_count} Confirmed
+              {project.confirmed_count ?? (project.project_services?.filter(s => ['confirmed', 'scheduled', 'completed'].includes(s.booking_status)).length || 0)} of {project.services_count ?? (project.project_services?.length || 0)} Confirmed
             </span>
           </div>
 
@@ -918,7 +918,7 @@ export default function FarmerProjectDetail() {
                     <div className="flex items-start justify-between border-b border-slate-100 pb-2">
                       <div>
                         <span className="text-[10px] font-bold uppercase text-slate-400">Crop Variety</span>
-                        <h4 className="font-bold text-slate-900 text-base">{s.variety}</h4>
+                        <h4 className="font-bold text-slate-900 text-base">{s.variety || s.variety_name}</h4>
                         <span className="text-xs text-slate-500">{s.crop}</span>
                       </div>
                       <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
@@ -929,11 +929,11 @@ export default function FarmerProjectDetail() {
                     </div>
 
                     <div className="space-y-1.5 text-xs text-slate-600">
-                      <div><strong>Breeder Source:</strong> {s.breeder_source}</div>
+                      <div><strong>Breeder Source:</strong> {s.breeder_source || s.source_breeder}</div>
                       <div><strong>Supplier:</strong> {s.supplier_name || 'Direct / NSC'}</div>
                       <div><strong>Lot Number:</strong> <span className="font-mono text-slate-700">{s.lot_number || 'N/A'}</span></div>
                       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <span>Quantity: <strong>{s.required_quantity} {s.unit}</strong></span>
+                        <span>Quantity: <strong>{s.required_quantity} {s.unit || s.quantity_unit}</strong></span>
                         <span className="font-bold text-[#174D32]">Cost: ₹{Number(s.recorded_cost).toLocaleString()}</span>
                       </div>
                     </div>
@@ -1040,15 +1040,15 @@ export default function FarmerProjectDetail() {
                     </div>
 
                     <div className="space-y-1.5 text-xs text-slate-600">
-                      <div><strong>Storage:</strong> {ph.storage_type} ({ph.storage_days} days)</div>
+                      <div><strong>Storage:</strong> {ph.storage_type_display || ph.storage_type} ({ph.storage_days ?? ph.storage_duration_days ?? 0} days)</div>
                       <div><strong>Location:</strong> {ph.storage_location || 'Local facility'}</div>
                       <div className="flex justify-between py-1 border-t border-slate-100">
-                        <span>Storage Cost: <strong>₹{Number(ph.storage_cost).toLocaleString()}</strong></span>
-                        <span>Transport Cost: <strong>₹{Number(ph.transport_cost).toLocaleString()}</strong></span>
+                        <span>Storage Cost: <strong>₹{Number(ph.storage_cost ?? ph.storage_cost_inr ?? 0).toLocaleString()}</strong></span>
+                        <span>Transport Cost: <strong>₹{Number(ph.transport_cost ?? ph.transport_cost_inr ?? 0).toLocaleString()}</strong></span>
                       </div>
                       <div className="flex items-center justify-between pt-1">
                         <span className="text-slate-400">Sale Status:</span>
-                        <span className="font-bold text-[#174D32] uppercase text-[11px]">{ph.sale_status}</span>
+                        <span className="font-bold text-[#174D32] uppercase text-[11px]">{ph.sale_status_display || ph.sale_status}</span>
                       </div>
                     </div>
                   </div>

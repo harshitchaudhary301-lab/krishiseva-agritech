@@ -32,6 +32,7 @@ class UserSerializer(serializers.ModelSerializer):
     farmer_profile = FarmerProfileSerializer(read_only=True)
     worker_profile = WorkerProfileSerializer(read_only=True)
     provider_profile = ProviderProfileSerializer(read_only=True)
+    verification_status = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -39,9 +40,20 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'phone', 'state', 'district', 'village',
             'profile_complete', 'date_joined',
-            'farmer_profile', 'worker_profile', 'provider_profile'
+            'farmer_profile', 'worker_profile', 'provider_profile',
+            'verification_status'
         ]
         read_only_fields = ['id', 'role', 'date_joined']
+
+    def get_verification_status(self, obj):
+        try:
+            if hasattr(obj, 'provider_profile') and obj.provider_profile:
+                return obj.provider_profile.verification_status
+            elif hasattr(obj, 'worker_profile') and obj.worker_profile:
+                return 'verified' if obj.worker_profile.is_verified else 'unverified'
+        except Exception:
+            pass
+        return 'verified' if (obj.is_staff or obj.role in ['farmer', 'admin']) else 'unverified'
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -166,11 +178,17 @@ class AdminVerificationActionSerializer(serializers.Serializer):
 class VerificationAuditLogSerializer(serializers.ModelSerializer):
     actor_name = serializers.ReadOnlyField(source='actor.get_full_name')
     target_username = serializers.ReadOnlyField(source='target_user.username')
+    subject_user_name = serializers.ReadOnlyField(source='target_user.username')
+    subject_user = serializers.ReadOnlyField(source='target_user.id')
+    created_at = serializers.ReadOnlyField(source='timestamp')
+    reviewed_by_name = serializers.ReadOnlyField(source='actor.get_full_name')
+    notes = serializers.ReadOnlyField(source='reason')
 
     class Meta:
         model = VerificationAuditLog
         fields = [
             'id', 'target_user', 'target_username', 'actor', 'actor_name',
-            'action', 'previous_status', 'new_status', 'reason', 'timestamp'
+            'action', 'previous_status', 'new_status', 'reason', 'timestamp',
+            'subject_user_name', 'subject_user', 'created_at', 'reviewed_by_name', 'notes'
         ]
 
