@@ -251,18 +251,146 @@ class ServiceCategory(models.Model):
 
 
 class ProviderService(models.Model):
+    PRICING_METHOD_CHOICES = [
+        ('fixed', 'Fixed Price'),
+        ('per_hour', 'Per Hour'),
+        ('per_day', 'Per Day'),
+        ('per_acre', 'Per Acre'),
+        ('per_hectare', 'Per Hectare'),
+        ('per_unit', 'Per Unit'),
+        ('quotation_required', 'Quotation Required'),
+    ]
+
     provider = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='services')
     category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='provider_services')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    pricing_method = models.CharField(max_length=30, choices=PRICING_METHOD_CHOICES, default='per_day')
     base_rate = models.DecimalField(max_digits=10, decimal_places=2)
+    price_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     rate_unit = models.CharField(max_length=50, default='per day') # per acre, per day, per hour, per machine
     equipment_models = models.CharField(max_length=255, blank=True, help_text="e.g. Mahindra 575 DI, John Deere 5050D")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        if self.price_amount is None and self.base_rate is not None:
+            self.price_amount = self.base_rate
+        elif self.price_amount is not None and self.base_rate is None:
+            self.base_rate = self.price_amount
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.provider.username} - {self.category.name_en}: {self.title}"
+
+
+class ProviderCoverageArea(models.Model):
+    """
+    Explicit geographic coverage registered by providers using official LGD identifiers.
+    Coverage can be declared at State, District, SubDistrict, or Village level.
+    A district-level coverage includes its subordinate locations only when includes_subordinates is True.
+    """
+    COVERAGE_LEVELS = [
+        ('state', 'State'),
+        ('district', 'District'),
+        ('subdistrict', 'Sub-District / Tehsil'),
+        ('village', 'Village'),
+    ]
+
+    provider = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='coverage_areas')
+    coverage_level = models.CharField(max_length=20, choices=COVERAGE_LEVELS, default='village')
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='provider_coverages', null=True, blank=True)
+    district = models.ForeignKey(District, on_delete=models.CASCADE, related_name='provider_coverages', null=True, blank=True)
+    subdistrict = models.ForeignKey(SubDistrict, on_delete=models.CASCADE, related_name='provider_coverages', null=True, blank=True)
+    village = models.ForeignKey(Village, on_delete=models.CASCADE, related_name='provider_coverages', null=True, blank=True)
+    includes_subordinates = models.BooleanField(
+        default=True,
+        help_text="If True, coverage extends to all subordinate administrative areas (e.g. district includes all its villages)"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['provider', 'coverage_level', 'id']
+        indexes = [
+            models.Index(fields=['provider', 'is_active']),
+            models.Index(fields=['coverage_level', 'is_active']),
+            models.Index(fields=['village', 'is_active']),
+            models.Index(fields=['subdistrict', 'is_active']),
+            models.Index(fields=['district', 'is_active']),
+        ]
+
+    def __str__(self):
+        target = "Nationwide"
+        if self.village:
+            target = f"Village: {self.village.name} (LGD: {self.village.lgd_code})"
+        elif self.subdistrict:
+            target = f"Tehsil: {self.subdistrict.name_en} (LGD: {self.subdistrict.lgd_code})"
+        elif self.district:
+            target = f"District: {self.district.name_en} (LGD: {self.district.lgd_code})"
+        elif self.state:
+            target = f"State: {self.state.name_en} (LGD: {self.state.lgd_code})"
+        sub = " [+ subordinates]" if self.includes_subordinates else " [standalone]"
+        return f"{self.provider.username} -> {target}{sub}"
+
+
+class ProviderResource(models.Model):
+    """
+    Physical or labour resources operated by service providers.
+    Tracks exclusive vs shared resources, capacity limits, and measurement units.
+    """
+    RESOURCE_TYPES = [
+        ('exclusive', 'Exclusive Machinery/Equipment'),
+        ('shared', 'Shared Labour/Resource Capacity'),
+    ]
+
+    provider = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='resources')
+    category = models.ForeignKey(ServiceCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='resources')
+    name = models.CharField(max_length=150, help_text="e.g. Mahindra 575 DI Tractor, 6-person Harvesting Crew")
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPES, default='exclusive')
+    capacity = models.DecimalField(max_digits=10, decimal_places=2, default=1.0)
+    capacity_unit = models.CharField(max_length=50, default='machine', help_text="e.g. machine, labourer, crew, acre/day")
+    identifier = models.CharField(max_length=100, blank=True, db_index=True, help_text="e.g. TRAC-575-01, LAB-CREW-1")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['provider', 'name']
+        indexes = [
+            models.Index(fields=['provider', 'is_active']),
+            models.Index(fields=['resource_type', 'is_active']),
+            models.Index(fields=['identifier']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_resource_type_display()}: {self.capacity} {self.capacity_unit}) - {self.provider.username}"
+
+
+class ProviderAvailabilityWindow(models.Model):
+    """
+    Declared scheduling windows for providers and resources.
+    Uses half-open intervals [start_date, end_date) where start_date <= d < end_date.
+    """
+    provider = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='availability_windows')
+    resource = models.ForeignKey(ProviderResource, on_delete=models.SET_NULL, null=True, blank=True, related_name='availability_windows')
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True, help_text="Half-open window: active on dates d where start_date <= d < end_date")
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    is_available = models.BooleanField(default=True, help_text="True for available scheduling window, False for blackout period")
+    notes = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['start_date', 'start_time']
+        indexes = [
+            models.Index(fields=['provider', 'start_date', 'end_date']),
+            models.Index(fields=['is_available']),
+        ]
+
+    def __str__(self):
+        status_str = "Available" if self.is_available else "Blackout"
+        return f"{self.provider.username} [{status_str}]: {self.start_date} to {self.end_date}"
 
 
 class Review(models.Model):

@@ -676,3 +676,82 @@ class FarmAnalyticsView(APIView):
         })
 
 
+class ProjectOperationRequestServiceView(APIView):
+    """
+    Step 9: Connects agricultural operation to the Service Matching Engine.
+    Allows farmer to select an operation, validate that it has no conflicting or duplicate
+    active service request / booking, and generate a linked ServiceRequest.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        op = get_object_or_404(ProjectOperation, pk=pk)
+        project = op.project
+
+        if project.farmer != request.user and not request.user.is_admin_role():
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check existing active request or booking (prevent duplicate fulfillments)
+        if op.service_request and op.service_request.status in ['open', 'quote_accepted', 'booked']:
+            return Response({
+                'error': f"Operation '{op.operation_name_en}' already has an active Service Request (REQ-{op.service_request_id}).",
+                'service_request_id': op.service_request_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if op.booking and op.booking.status in ['confirmed', 'scheduled', 'in_progress', 'completion_pending']:
+            return Response({
+                'error': f"Operation '{op.operation_name_en}' already has an active Confirmed Booking ({op.booking.reference_id}).",
+                'booking_id': op.booking_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        category = op.service_category
+        if not category:
+            cat_id = request.data.get('category_id') or request.data.get('category')
+            if cat_id:
+                category = get_object_or_404(ServiceCategory, pk=cat_id)
+            else:
+                return Response({'error': 'A service category must be selected for this operation.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract delivery location from farm
+        farm = project.farm
+        village = farm.village if farm else request.user.village
+        district = farm.district if farm else request.user.district
+        state = farm.state if farm else request.user.state
+
+        title = request.data.get('title') or f"{op.operation_name_en} — {project.name}"
+        desc = request.data.get('description') or f"Required for {project.crop} operation '{op.operation_name_en}' in {project.name}."
+        scope = request.data.get('scope_quantity') or f"{project.target_area_acres} Acres / {op.operation_name_en}"
+        req_date = request.data.get('required_date') or op.planned_start_date or timezone.localdate()
+
+        from bookings.models import ServiceRequest
+        srv_req = ServiceRequest.objects.create(
+            farmer=request.user,
+            category=category,
+            farm_project=project,
+            title=title,
+            description=desc,
+            village=village,
+            district=district,
+            state=state,
+            required_date=req_date,
+            scope_quantity=scope,
+            budget_max=request.data.get('budget_max')
+        )
+
+        op.service_category = category
+        op.service_request = srv_req
+        op.status = 'service_requested'
+        op.save()
+
+        project.update_project_status()
+
+        from bookings.serializers import ServiceRequestSerializer
+        return Response({
+            'message': f"Linked service request created for operation '{op.operation_name_en}'.",
+            'service_request': ServiceRequestSerializer(srv_req).data,
+            'operation_id': op.id,
+            'operation_status': op.status
+        }, status=status.HTTP_201_CREATED)
+
+
+

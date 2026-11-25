@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import (
     ServiceCategory, Village, ProviderService, Review,
     AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage,
-    InstitutionalResource, State, District, SubDistrict, DevelopmentBlock, LocalBody, Ward
+    InstitutionalResource, State, District, SubDistrict, DevelopmentBlock, LocalBody, Ward,
+    ProviderCoverageArea, ProviderResource, ProviderAvailabilityWindow
 )
 from accounts.serializers import UserSerializer
 
@@ -100,8 +101,59 @@ class ProviderServiceSerializer(serializers.ModelSerializer):
             'id', 'provider', 'provider_name', 'provider_username',
             'provider_village', 'provider_phone', 'category',
             'category_slug', 'category_name', 'title', 'description',
-            'base_rate', 'rate_unit', 'equipment_models', 'is_active', 'created_at'
+            'pricing_method', 'price_amount', 'base_rate', 'rate_unit',
+            'equipment_models', 'is_active', 'created_at'
         ]
+
+
+class ProviderCoverageAreaSerializer(serializers.ModelSerializer):
+    state_name = serializers.CharField(source='state.name_en', read_only=True)
+    state_lgd = serializers.IntegerField(source='state.lgd_code', read_only=True)
+    district_name = serializers.CharField(source='district.name_en', read_only=True)
+    district_lgd = serializers.IntegerField(source='district.lgd_code', read_only=True)
+    subdistrict_name = serializers.CharField(source='subdistrict.name_en', read_only=True)
+    subdistrict_lgd = serializers.IntegerField(source='subdistrict.lgd_code', read_only=True)
+    village_name = serializers.CharField(source='village.name', read_only=True)
+    village_lgd = serializers.IntegerField(source='village.lgd_code', read_only=True)
+
+    class Meta:
+        model = ProviderCoverageArea
+        fields = [
+            'id', 'provider', 'coverage_level',
+            'state', 'state_name', 'state_lgd',
+            'district', 'district_name', 'district_lgd',
+            'subdistrict', 'subdistrict_name', 'subdistrict_lgd',
+            'village', 'village_name', 'village_lgd',
+            'includes_subordinates', 'is_active', 'created_at'
+        ]
+        read_only_fields = ['provider', 'created_at']
+
+
+class ProviderResourceSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name_en', read_only=True)
+
+    class Meta:
+        model = ProviderResource
+        fields = [
+            'id', 'provider', 'name', 'resource_type',
+            'category', 'category_name',
+            'capacity', 'capacity_unit', 'identifier',
+            'is_active', 'created_at'
+        ]
+        read_only_fields = ['provider', 'created_at']
+
+
+class ProviderAvailabilityWindowSerializer(serializers.ModelSerializer):
+    resource_name = serializers.CharField(source='resource.name', read_only=True)
+
+    class Meta:
+        model = ProviderAvailabilityWindow
+        fields = [
+            'id', 'provider', 'resource', 'resource_name',
+            'start_date', 'end_date', 'start_time', 'end_time',
+            'is_available', 'notes', 'created_at'
+        ]
+        read_only_fields = ['provider', 'created_at']
 
 
 class ReviewSerializer(serializers.ModelSerializer):

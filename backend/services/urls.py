@@ -7,7 +7,11 @@ from .views import (
     WeatherForecastView,
     StateListView, DistrictListView, SubDistrictListView, DevelopmentBlockListView,
     LocalBodyListView, WardListView, NationwideVillageListView, LocationSearchView,
-    LocationValidateView
+    LocationValidateView,
+    ProviderCoverageAreaListCreateView, ProviderCoverageAreaDetailView,
+    ProviderResourceListCreateView, ProviderResourceDetailView,
+    ProviderAvailabilityWindowListCreateView, ProviderAvailabilityWindowDetailView,
+    ProviderServiceManageView
 )
 
 urlpatterns = [
@@ -20,6 +24,15 @@ urlpatterns = [
     path('reference-data/records/', AgriculturalReferenceRecordListView.as_view(), name='agricultural-reference-records'),
     path('government-connect/', InstitutionalResourceListView.as_view(), name='government-connect'),
     path('weather/', WeatherForecastView.as_view(), name='weather-forecast'),
+
+    # Provider Self-Management Endpoints
+    path('provider/coverage/', ProviderCoverageAreaListCreateView.as_view(), name='provider-coverage-list-create'),
+    path('provider/coverage/<int:pk>/', ProviderCoverageAreaDetailView.as_view(), name='provider-coverage-detail'),
+    path('provider/resources/', ProviderResourceListCreateView.as_view(), name='provider-resources-list-create'),
+    path('provider/resources/<int:pk>/', ProviderResourceDetailView.as_view(), name='provider-resources-detail'),
+    path('provider/availability/', ProviderAvailabilityWindowListCreateView.as_view(), name='provider-availability-list-create'),
+    path('provider/availability/<int:pk>/', ProviderAvailabilityWindowDetailView.as_view(), name='provider-availability-detail'),
+    path('provider/services/', ProviderServiceManageView.as_view(), name='provider-services-manage'),
 
     # Nationwide LGD Central Location Engine Endpoints
     path('locations/states/', StateListView.as_view(), name='location-states'),

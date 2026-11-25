@@ -92,6 +92,20 @@ export default function FarmerProjectDetail() {
     }
   };
 
+  const handleRequestServiceForOperation = async (op) => {
+    try {
+      const catId = op.service_category || (categories.find(c => c.is_active)?.id);
+      await api.post(`/farm-projects/operations/${op.id}/request-service/`, {
+        category_id: catId
+      });
+      alert(lang === 'hi' ? 'सेवा मांग सफलतापूर्वक बनाई गई! आप प्रदाता कोटेशन प्राप्त कर सकते हैं।' : 'Service requirement linked! Request created.');
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to request service for this operation.');
+    }
+  };
+
   const fetchProjectDetails = async () => {
     setLoading(true);
     try {
@@ -657,15 +671,34 @@ export default function FarmerProjectDetail() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center">
+                      <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                        {!isDone && !op.service_request && (
+                          <button
+                            onClick={() => handleRequestServiceForOperation(op)}
+                            className="px-3.5 py-2 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            title="Generate linked service request to find matching providers"
+                          >
+                            <Wrench className="w-3.5 h-3.5 text-[#E8B44C]" />
+                            <span>{lang === 'hi' ? 'सेवा मांगें (SME)' : 'Find & Request Service'}</span>
+                          </button>
+                        )}
+                        {!isDone && op.service_request && (
+                          <Link
+                            to={`/farmer/requests/${op.service_request}`}
+                            className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold hover:bg-amber-100 transition flex items-center gap-1"
+                          >
+                            <span>REQ-{op.service_request} Linked</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        )}
                         {isReady && !isDone && (
                           <button
                             onClick={() => handleCompleteOperation(op.id)}
-                            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                             title="Mark completed directly and unlock dependent tasks"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{lang === 'hi' ? 'स्वयं पूर्ण मार्क करें' : 'Mark Completed (Manual)'}</span>
+                            <span>{lang === 'hi' ? 'स्वयं पूर्ण' : 'Manual Complete'}</span>
                           </button>
                         )}
                         {isDone && (

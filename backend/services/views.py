@@ -6,13 +6,15 @@ from django.db.models import Q, Avg
 from .models import (
     ServiceCategory, Village, ProviderService, Review,
     AgriculturalReferenceRecord, HistoricalMachineryRate, HistoricalAgriculturalWage,
-    InstitutionalResource, State, District, SubDistrict, DevelopmentBlock, LocalBody, Ward
+    InstitutionalResource, State, District, SubDistrict, DevelopmentBlock, LocalBody, Ward,
+    ProviderCoverageArea, ProviderResource, ProviderAvailabilityWindow
 )
 from .serializers import (
     ServiceCategorySerializer, VillageSerializer, ProviderServiceSerializer, ReviewSerializer,
     AgriculturalReferenceRecordSerializer, HistoricalMachineryRateSerializer, HistoricalAgriculturalWageSerializer,
     InstitutionalResourceSerializer, StateSerializer, DistrictSerializer, SubDistrictSerializer,
-    DevelopmentBlockSerializer, LocalBodySerializer, WardSerializer
+    DevelopmentBlockSerializer, LocalBodySerializer, WardSerializer,
+    ProviderCoverageAreaSerializer, ProviderResourceSerializer, ProviderAvailabilityWindowSerializer
 )
 from .weather import get_weather_forecast
 from accounts.models import User
@@ -551,4 +553,184 @@ class WeatherForecastView(APIView):
         district = request.query_params.get('district', 'Meerut')
         weather_data = get_weather_forecast(latitude=lat, longitude=lon, district=district)
         return Response(weather_data)
+
+
+class ProviderCoverageAreaListCreateView(APIView):
+    """
+    Allows verified providers to view and register explicit LGD coverage areas.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        coverages = ProviderCoverageArea.objects.filter(provider=request.user).select_related(
+            'state', 'district', 'subdistrict', 'village'
+        )
+        return Response(ProviderCoverageAreaSerializer(coverages, many=True).data)
+
+    def post(self, request):
+        user = request.user
+        if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
+            return Response({'error': 'Only providers or workers can configure coverage areas.'}, status=status.HTTP_403_FORBIDDEN)
+
+        coverage_level = request.data.get('coverage_level', 'village')
+        state_id = request.data.get('state_id')
+        district_id = request.data.get('district_id')
+        subdistrict_id = request.data.get('subdistrict_id')
+        village_id = request.data.get('village_id')
+        includes_subordinates = request.data.get('includes_subordinates', True)
+
+        state_obj = State.objects.filter(pk=state_id).first() if state_id else None
+        district_obj = District.objects.filter(pk=district_id).first() if district_id else None
+        subdistrict_obj = SubDistrict.objects.filter(pk=subdistrict_id).first() if subdistrict_id else None
+        village_obj = Village.objects.filter(pk=village_id).first() if village_id else None
+
+        if village_obj:
+            if not subdistrict_obj and village_obj.subdistrict:
+                subdistrict_obj = village_obj.subdistrict
+            if not district_obj and village_obj.district_ref:
+                district_obj = village_obj.district_ref
+            if not state_obj and village_obj.state_ref:
+                state_obj = village_obj.state_ref
+        elif subdistrict_obj:
+            if not district_obj and subdistrict_obj.district:
+                district_obj = subdistrict_obj.district
+            if not state_obj and subdistrict_obj.district and subdistrict_obj.district.state:
+                state_obj = subdistrict_obj.district.state
+        elif district_obj:
+            if not state_obj and district_obj.state:
+                state_obj = district_obj.state
+
+        coverage, created = ProviderCoverageArea.objects.get_or_create(
+            provider=user,
+            coverage_level=coverage_level,
+            state=state_obj,
+            district=district_obj,
+            subdistrict=subdistrict_obj,
+            village=village_obj,
+            defaults={'includes_subordinates': bool(includes_subordinates), 'is_active': True}
+        )
+        if not created:
+            coverage.includes_subordinates = bool(includes_subordinates)
+            coverage.is_active = True
+            coverage.save()
+
+        return Response(ProviderCoverageAreaSerializer(coverage).data, status=status.HTTP_201_CREATED)
+
+
+class ProviderCoverageAreaDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk):
+        cov = get_object_or_404(ProviderCoverageArea, pk=pk, provider=request.user)
+        cov.delete()
+        return Response({'message': 'Coverage area removed.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class ProviderResourceListCreateView(APIView):
+    """
+    Allows providers to register exclusive and shared resources and declare capacity.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        resources = ProviderResource.objects.filter(provider=request.user).select_related('category')
+        return Response(ProviderResourceSerializer(resources, many=True).data)
+
+    def post(self, request):
+        user = request.user
+        if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
+            return Response({'error': 'Only providers or workers can configure resources.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ProviderResourceSerializer(data=request.data)
+        if serializer.is_valid():
+            res = serializer.save(provider=user)
+            return Response(ProviderResourceSerializer(res).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProviderResourceDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def put(self, request, pk):
+        res = get_object_or_404(ProviderResource, pk=pk, provider=request.user)
+        serializer = ProviderResourceSerializer(res, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated = serializer.save()
+            return Response(ProviderResourceSerializer(updated).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        res = get_object_or_404(ProviderResource, pk=pk, provider=request.user)
+        res.delete()
+        return Response({'message': 'Resource deleted.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class ProviderAvailabilityWindowListCreateView(APIView):
+    """
+    Allows providers to register scheduled availability windows or declare blackouts.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        windows = ProviderAvailabilityWindow.objects.filter(provider=request.user).select_related('resource')
+        return Response(ProviderAvailabilityWindowSerializer(windows, many=True).data)
+
+    def post(self, request):
+        user = request.user
+        if not (user.is_provider() or user.is_worker() or user.is_admin_role()):
+            return Response({'error': 'Only providers or workers can configure availability windows.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ProviderAvailabilityWindowSerializer(data=request.data)
+        if serializer.is_valid():
+            window = serializer.save(provider=user)
+            return Response(ProviderAvailabilityWindowSerializer(window).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProviderAvailabilityWindowDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk):
+        window = get_object_or_404(ProviderAvailabilityWindow, pk=pk, provider=request.user)
+        window.delete()
+        return Response({'message': 'Availability window deleted.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class ProviderServiceManageView(APIView):
+    """
+    Manage services offered by provider, including pricing method and decimal price amounts.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        services = ProviderService.objects.filter(provider=request.user).select_related('category')
+        return Response(ProviderServiceSerializer(services, many=True).data)
+
+    def post(self, request):
+        user = request.user
+        category_id = request.data.get('category_id') or request.data.get('category')
+        category = get_object_or_404(ServiceCategory, pk=category_id)
+
+        title = request.data.get('title') or f"{category.name_en} Service"
+        description = request.data.get('description', '')
+        pricing_method = request.data.get('pricing_method', 'per_day')
+        base_rate = request.data.get('price_amount') or request.data.get('base_rate', 0.0)
+        rate_unit = request.data.get('rate_unit', 'per day')
+        equipment_models = request.data.get('equipment_models', '')
+
+        service, created = ProviderService.objects.update_or_create(
+            provider=user,
+            category=category,
+            defaults={
+                'title': title,
+                'description': description,
+                'pricing_method': pricing_method,
+                'price_amount': base_rate,
+                'base_rate': base_rate,
+                'rate_unit': rate_unit,
+                'equipment_models': equipment_models,
+                'is_active': True
+            }
+        )
+        return Response(ProviderServiceSerializer(service).data, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
 

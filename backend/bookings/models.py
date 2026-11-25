@@ -196,6 +196,10 @@ class Booking(models.Model):
             if hasattr(actor_user, 'worker_profile') and not actor_user.worker_profile.is_verified():
                 raise ValidationError("Unverified worker cannot confirm bookings. Administrative verification required.")
 
+            # Revalidate quotation expiry and version
+            if locked.quotation and locked.quotation.is_expired():
+                raise ValidationError("Cannot confirm booking: quotation has expired (BOOK-04).")
+
             if Booking.check_double_booking(locked.provider_id, locked.scheduled_date, exclude_booking_id=locked.id, exclusive_resource_id=locked.exclusive_resource_id):
                 raise ValidationError(f"Double-booking conflict: Resource reservation conflict: Exclusive resource or provider already booked for {locked.scheduled_date} (BOOK-07).")
 
@@ -220,6 +224,9 @@ class Booking(models.Model):
             # Update request status
             locked.request.status = 'booked'
             locked.request.save()
+
+            # Update linked farm project operations to scheduled (BOOK-05 / Step 9)
+            locked.request.linked_operations.update(booking=locked, status='scheduled')
 
             # Record event
             BookingEvent.objects.create(
@@ -352,6 +359,12 @@ class Booking(models.Model):
                 locked.completed_at = timezone.now()
                 locked.request.status = 'completed'
                 locked.request.save()
+
+                # Update linked farm operations to completed
+                locked.request.linked_operations.update(
+                    status='completed',
+                    actual_completion_date=timezone.localdate()
+                )
 
                 # Release reservation
                 ResourceReservation.objects.filter(booking=locked).update(is_active=False)

@@ -13,6 +13,7 @@ from .views import (
     CropObservationListCreateView,
     PostHarvestRecordListCreateView,
     ProjectOperationManualCompleteView,
+    ProjectOperationRequestServiceView,
     FarmAnalyticsView
 )
 
@@ -32,6 +33,7 @@ urlpatterns = [
     path('projects/<int:project_pk>/operations/', ProjectOperationListCreateView.as_view(), name='project-operations-list-create'),
     path('operations/<int:pk>/', ProjectOperationDetailView.as_view(), name='project-operation-detail'),
     path('operations/<int:pk>/mark-completed/', ProjectOperationManualCompleteView.as_view(), name='project-operation-mark-completed'),
+    path('operations/<int:pk>/request-service/', ProjectOperationRequestServiceView.as_view(), name='project-operation-request-service'),
     path('projects/<int:pk>/add-service/', ProjectAddServiceView.as_view(), name='project-add-service'),
     path('projects/<int:project_pk>/seeds/', SeedProcurementRecordListCreateView.as_view(), name='project-seeds'),
     path('projects/<int:project_pk>/observations/', CropObservationListCreateView.as_view(), name='project-observations'),
