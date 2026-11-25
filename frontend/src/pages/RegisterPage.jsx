@@ -91,7 +91,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F9F5] py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F4F4EE] py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         {/* Brand Header */}
         <div className="text-center mb-8">
@@ -102,20 +102,20 @@ export default function RegisterPage() {
                 <path d="M12 6V18M12 11L8 8M12 14L16 11M12 17L8 15" strokeWidth="2" strokeLinecap="round" stroke="#FFFFFF"/>
               </svg>
             </div>
-            <span className="text-2xl font-black text-[#174D32]">
+            <span className="text-2xl font-black text-[#101510]">
               Krishi<span className="text-[#84B547]">Seva</span>
             </span>
           </Link>
-          <h2 className="text-2xl font-extrabold text-slate-900 mt-2">
+          <h2 className="text-2xl sm:text-3xl font-black text-[#172D20] mt-2">
             {lang === 'hi' ? 'कृषि सेवा पर नया खाता बनाएं' : 'Create your KrishiSeva account'}
           </h2>
-          <p className="text-xs text-slate-600 mt-1">
+          <p className="text-xs text-[#64748B] mt-1">
             {lang === 'hi' ? 'खेती की हर जरूरत, एक जगह।' : 'The Farm Operations Coordination Platform'}
           </p>
         </div>
 
         {/* Form Container */}
-        <div className="bg-white p-6 sm:p-10 rounded-3xl shadow-xl border border-slate-200">
+        <div className="bg-white p-6 sm:p-10 rounded-3xl shadow-xl border border-[#E2E8DF]">
           {error && (
             <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-2 border border-red-200">
               <AlertCircle className="w-4 h-4 shrink-0" />

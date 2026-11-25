@@ -356,3 +356,176 @@ All required checks were executed and confirmed:
 | **4. Frontend Production Build** | `npm --prefix frontend run build` | `✓ built in 1.47s` (2,666 modules transformed, 0 syntax/bundling errors). | **PASSED** |
 | **5. Live Weather Integration** | `python backend/manage.py shell -c "from services.weather import get_weather_forecast; ..."` | Verified Open-Meteo live API resolution (`status: fresh`, `is_live: True`). | **PASSED** |
 | **6. Ledger Traceability** | `python backend/manage.py shell` relational query verification | Seed & Post-Harvest records cleanly linked to `ExpenseRecord` and `RevenueRecord` with zero double entries. | **PASSED** |
+
+## 10. PART 04: FINAL VISUAL UI/UX REDESIGN (KS-FDC-04)
+
+**Task ID:** KS-FDC-04-FINAL  
+**Branch:** `mission03-mvp`  
+**Execution Mode:** Reference-Locked, Controlled Implementation  
+**Status:** **STAGE 01 COMPLETE — AWAITING HERO APPROVAL (GATE A)**
+
+---
+
+### 10.1 Stage 00 — Foundation Preparation (COMPLETE)
+
+#### Git Baseline
+- **Branch:** `mission03-mvp`  
+- **Starting Commit:** `746ed04` (KS-FDC-03 completion)  
+- **Stage 00+01 Commit:** `b2eba90`
+
+#### Component Inventory (Located)
+
+| Component | Path | Status |
+|---|---|---|
+| Landing Page | `frontend/src/pages/LandingPage.jsx` | **Redesigned (cinematic hero)** |
+| App Router | `frontend/src/App.jsx` | **Modified (standalone landing)** |
+| Navbar | `frontend/src/components/Navbar.jsx` | Preserved (used by dashboards) |
+| Footer | `frontend/src/components/Footer.jsx` | Preserved |
+| Auth: Login | `frontend/src/pages/LoginPage.jsx` | Preserved |
+| Auth: Register | `frontend/src/pages/RegisterPage.jsx` | Preserved |
+| Farmer Dashboard | `frontend/src/pages/farmer/FarmerOverview.jsx` | Pending Stage 03 |
+| Farmer Layout | `frontend/src/pages/farmer/FarmerLayout.jsx` | Pending Stage 03 |
+| Provider Layout | `frontend/src/pages/provider/ProviderLayout.jsx` | Pending Stage 05 |
+| Worker Layout | `frontend/src/pages/worker/WorkerLayout.jsx` | Pending Stage 05 |
+| Admin Dashboard | `frontend/src/pages/admin/AdminDashboard.jsx` | Pending Stage 05 |
+| LanguageContext | `frontend/src/context/LanguageContext.jsx` | Preserved |
+| API Client | `frontend/src/api/client.js` | Preserved |
+| Tailwind / CSS | `frontend/src/index.css` | **Updated (approved design system)** |
+| ProtectedRoute | `frontend/src/components/ProtectedRoute.jsx` | Preserved |
+
+#### Design System Updates
+
+| Token | Old Value | New Value |
+|---|---|---|
+| `--color-obsidian` | *not defined* | `#101510` |
+| `--color-harvest` | *not defined* | `#FCE052` |
+| `--color-cream` | `#F5F1E6` | `#F4F4EE` |
+| `--color-primary-text` | *not defined* | `#172D20` |
+| `--color-secondary-text` | *not defined* | `#64748B` |
+| `--color-border` | *not defined* | `#E2E8DF` |
+
+#### Isolated Database Confirmation
+- **Database:** `backend/db.sqlite3` (SQLite, isolated local development)
+- **Backup created:** `backend/db.sqlite3.bak_ks_fdc_04` (pre-schema-change snapshot)
+- **External gateways:** Disabled
+
+---
+
+### 10.2 Data Default Corrections (COMPLETE)
+
+Removed unsupported automatic defaults per §8:
+
+| Model | Field | Old Default | New Default |
+|---|---|---|---|
+| `Farm` | `land_tenure` | `'owned'` | `''` (blank) |
+| `Farm` | `size_acres` | `10.0` | `null` |
+| `Farm` | `current_crops` | `'Wheat'` | `''` (blank) |
+| `Farm` | `soil_type` | `'Alluvial Loam'` | `''` (blank) |
+| `Farm` | `irrigation_source` | `'Tubewell + Canal'` | `''` (blank) |
+| `Field` | `area_acres` | `5.0` | `null` |
+| `Field` | `land_tenure` | `'owned'` | `''` (blank) |
+| `Field` | `soil_type` | `'Alluvial Loam'` | `''` (blank) |
+| `Field` | `irrigation_status` | `'Tubewell Irrigated'` | `''` (blank) |
+
+- **Migration:** `farm_projects.0008_remove_automatic_defaults_ks_fdc_04` — applied successfully
+- **Django system check:** `System check identified no issues (0 silenced).`
+- **Existing records:** Preserved (existing data untouched — the migration only changes model defaults for new records)
+
+---
+
+### 10.3 Stage 01 — Cinematic Hero Implementation (COMPLETE)
+
+#### Asset Library
+
+| Asset | Path | Dimensions | Size | Source |
+|---|---|---|---|---|
+| Desktop Hero | `frontend/public/images/krishiseva/hero/hero-desktop.jpg` | AI-generated landscape | ~875 KB | Generated via Antigravity image-generator |
+| Mobile Hero | `frontend/public/images/krishiseva/hero/hero-mobile.jpg` | AI-generated portrait | ~811 KB | Generated via Antigravity image-generator |
+
+#### Hero Implementation Details
+
+**Architecture Changes:**
+- `App.jsx`: Landing page route no longer wraps in `PublicLayout` (removes sticky Navbar/Footer) — the hero has its own integrated floating navigation
+- `LandingPage.jsx`: Complete cinematic redesign with floating obsidian nav, full-bleed hero image, responsive layout
+
+**Desktop Layout (1440px):**
+- Outer margin: ~24–32px
+- Rounded container: 32px border-radius
+- Hero height: `clamp(500px, 90vh, 960px)`
+- Floating obsidian pill navigation (fixed, responsive)
+- Lower-left: Eyebrow → Headline → Description → CTAs
+- Lower-right: "Your Digital Farm Manager" feature card
+- Layered gradient overlays for text readability over photograph
+- Harvest-yellow (#FCE052) primary CTA → `/register`
+- Secondary CTA (outline) → `#services` section anchor
+
+**Mobile Layout (390px):**
+- Responsive text scaling (36px headline)
+- Compact floating nav with hamburger
+- Feature card rendered below hero section (not overlapping)
+- Full-width CTAs
+- Responsive capability grid (2 columns)
+
+**Capability Strip:**
+- Farm Planning | Service Discovery | Expense Management | Agricultural Records
+- Obsidian background, harvest-yellow icons
+
+**Navigation Links:**
+- Home → `#hero`
+- Services → `#services`
+- Farm Planning → `#farm-planning`
+- How It Works → `#how-it-works`
+- Language toggle, Sign Up → `/register`, Log In → `/login`
+
+#### Developer Check Results
+
+| Check | Command | Outcome | Status |
+|---|---|---|---|
+| Django System Check | `python backend/manage.py check` | No issues | **PASSED** |
+| Migration Consistency | `makemigrations --check --dry-run` | 0008 applied | **PASSED** |
+| Frontend Build | `npm --prefix frontend run build` | ✓ built in 1.14s | **PASSED** |
+
+#### Changed Files
+- `backend/farm_projects/models.py` — Removed automatic defaults
+- `backend/farm_projects/migrations/0008_remove_automatic_defaults_ks_fdc_04.py` — New migration
+- `frontend/src/index.css` — Updated design system tokens
+- `frontend/src/App.jsx` — Standalone landing page route
+- `frontend/src/pages/LandingPage.jsx` — Complete cinematic hero redesign
+- `frontend/public/images/krishiseva/hero/hero-desktop.jpg` — New hero image (desktop)
+- `frontend/public/images/krishiseva/hero/hero-mobile.jpg` — New hero image (mobile)
+- `docs/design-references/REFERENCE_MAP.md` — Visual reference registry
+
+#### Local Commit
+- **SHA:** `b2eba90`
+- **Message:** `feat(ui): cinematic hero landing page, design system update, remove automatic data defaults (KS-FDC-04 Stage 00+01)`
+
+---
+
+### 10.4 Visual Acceptance — Hero
+
+Screenshots captured via browser automation at:
+- Desktop: 1440 × 900 viewport
+- Mobile: 390 × 844 viewport
+
+**Status:** AWAITING HERO APPROVAL (GATE A)
+
+---
+
+### 10.5 Next Authorized Stage
+
+**Gate A must be approved before proceeding.**
+
+Upon approval, Stage 02 will implement:
+- Complete landing page sections (services, farm manager showcase, ecosystem, how-it-works, onboarding, FAQ, CTA, footer)
+- Authentication interface redesign
+- Farmer dashboard (Stage 03)
+
+---
+
+### 10.6 Blockers
+
+| Blocker | Severity | Notes |
+|---|---|---|
+| Hero image file size (~875KB desktop, ~811KB mobile) | Low | Exceeds target <400KB. Can be optimized with compression tools if available. Quality preserved per §5 guidelines. |
+| Remaining landing page sections are placeholder anchors | Expected | Will be implemented in Stage 02 after Gate A approval |
+

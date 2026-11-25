@@ -119,7 +119,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F9F5] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F4F4EE] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Brand header */}
         <Link to="/" className="flex flex-col items-center group">
@@ -129,22 +129,22 @@ export default function LoginPage() {
               <path d="M12 6V18M12 11L8 8M12 14L16 11M12 17L8 15" strokeWidth="2" strokeLinecap="round" stroke="#FFFFFF"/>
             </svg>
           </div>
-          <span className="text-2xl font-black text-[#174D32]">
+          <span className="text-2xl font-black text-[#101510]">
             Krishi<span className="text-[#84B547]">Seva</span>
           </span>
-          <span className="text-xs text-slate-500 font-hindi mt-0.5">
+          <span className="text-xs text-[#64748B] font-hindi mt-0.5">
             खेती की हर जरूरत, एक जगह।
           </span>
         </Link>
-        <h2 className="mt-4 text-center text-xl font-bold text-slate-900">
+        <h2 className="mt-4 text-center text-2xl font-black text-[#172D20]">
           {lang === 'hi' ? 'अपने खाते में लॉगिन करें' : 'Sign in to your account'}
         </h2>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         {/* Quick Demo Login Box */}
-        <div className="bg-gradient-to-r from-amber-50 to-emerald-50 border border-amber-200/80 rounded-2xl p-4 mb-6 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-900 mb-2.5">
+        <div className="bg-[#FAF8F2] border border-[#E2E8DF] rounded-2xl p-4 mb-6 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#172D20] mb-2.5">
             <Sparkles className="w-4 h-4 text-[#E8B44C]" />
             <span>{lang === 'hi' ? 'एक-क्लिक त्वरित डेमो लॉगिन:' : 'One-Click Quick Demo Switch:'}</span>
           </div>
@@ -152,39 +152,39 @@ export default function LoginPage() {
             <button
               onClick={() => handleDemo('farmer')}
               disabled={demoLoading !== null}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:border-emerald-500 font-bold text-emerald-900 text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
+              className="p-2 rounded-xl bg-white border border-[#E2E8DF] hover:border-[#174D32] font-bold text-[#172D20] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
             >
               <span>👨‍🌾 Ramesh (Farmer)</span>
-              {demoLoading === 'farmer' && <Loader2 className="w-3 h-3 animate-spin text-emerald-700" />}
+              {demoLoading === 'farmer' && <Loader2 className="w-3 h-3 animate-spin text-[#174D32]" />}
             </button>
             <button
               onClick={() => handleDemo('worker')}
               disabled={demoLoading !== null}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:border-lime-500 font-bold text-lime-900 text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
+              className="p-2 rounded-xl bg-white border border-[#E2E8DF] hover:border-[#174D32] font-bold text-[#172D20] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
             >
               <span>👷 Suresh (Worker)</span>
-              {demoLoading === 'worker' && <Loader2 className="w-3 h-3 animate-spin text-lime-700" />}
+              {demoLoading === 'worker' && <Loader2 className="w-3 h-3 animate-spin text-[#174D32]" />}
             </button>
             <button
               onClick={() => handleDemo('mechanic')}
               disabled={demoLoading !== null}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:border-amber-500 font-bold text-amber-900 text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
+              className="p-2 rounded-xl bg-white border border-[#E2E8DF] hover:border-[#174D32] font-bold text-[#172D20] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
             >
               <span>🔧 Vikram (Mechanic)</span>
-              {demoLoading === 'mechanic' && <Loader2 className="w-3 h-3 animate-spin text-amber-700" />}
+              {demoLoading === 'mechanic' && <Loader2 className="w-3 h-3 animate-spin text-[#174D32]" />}
             </button>
             <button
               onClick={() => handleDemo('machinery')}
               disabled={demoLoading !== null}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:border-sky-500 font-bold text-sky-900 text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
+              className="p-2 rounded-xl bg-white border border-[#E2E8DF] hover:border-[#174D32] font-bold text-[#172D20] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
             >
               <span>🚜 Baldev (Harvester)</span>
-              {demoLoading === 'machinery' && <Loader2 className="w-3 h-3 animate-spin text-sky-700" />}
+              {demoLoading === 'machinery' && <Loader2 className="w-3 h-3 animate-spin text-[#174D32]" />}
             </button>
             <button
               onClick={() => handleDemo('admin')}
               disabled={demoLoading !== null}
-              className="col-span-2 p-2 rounded-xl bg-white border border-amber-300 hover:border-[#174D32] font-bold text-[#174D32] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
+              className="col-span-2 p-2 rounded-xl bg-white border border-[#E2E8DF] hover:border-[#174D32] font-bold text-[#174D32] text-left shadow-2xs hover:shadow-xs transition cursor-pointer flex items-center justify-between"
             >
               <span>🛡️ Platform Admin (Compliance Desk)</span>
               {demoLoading === 'admin' && <Loader2 className="w-3 h-3 animate-spin text-[#174D32]" />}
@@ -193,7 +193,7 @@ export default function LoginPage() {
         </div>
 
         {/* Regular Login Card */}
-        <div className="bg-white py-8 px-6 shadow-xl rounded-3xl border border-slate-200 sm:px-10">
+        <div className="bg-white py-8 px-6 shadow-xl rounded-3xl border border-[#E2E8DF] sm:px-10">
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-2 border border-red-200">
               <AlertCircle className="w-4 h-4 shrink-0" />
