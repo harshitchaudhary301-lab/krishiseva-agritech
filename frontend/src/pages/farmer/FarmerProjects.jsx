@@ -12,6 +12,7 @@ export default function FarmerProjects() {
   const { lang, t } = useLanguage();
   const [projects, setProjects] = useState([]);
   const [farms, setFarms] = useState([]);
+  const [cropTemplates, setCropTemplates] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,29 +21,52 @@ export default function FarmerProjects() {
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    name: 'Wheat Harvesting 2026',
+    name: 'Wheat Season 2026',
     crop: 'Wheat',
-    target_area_acres: '20',
+    variant: 'Standard High-Yielding',
+    crop_template_id: '',
+    target_area_acres: '10',
     farm: '',
-    start_date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-    expected_completion_date: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
-    notes: 'Complete harvesting operations coordination.'
+    field: '',
+    start_date: new Date().toISOString().split('T')[0],
+    expected_completion_date: new Date(Date.now() + 86400000 * 120).toISOString().split('T')[0],
+    notes: 'Coordinated crop management workflow.'
   });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [projRes, farmRes, catRes] = await Promise.all([
+      const [projRes, farmRes, catRes, tmplRes] = await Promise.all([
         api.get('/farm-projects/projects/'),
         api.get('/farm-projects/farms/'),
-        api.get('/services/categories/')
+        api.get('/services/categories/'),
+        api.get('/farm-projects/crop-templates/').catch(() => ({ data: [] }))
       ]);
       setProjects(projRes.data);
       setFarms(farmRes.data);
       setCategories(catRes.data);
+      setCropTemplates(tmplRes.data || []);
+
       if (farmRes.data.length > 0 && !formData.farm) {
-        setFormData(prev => ({ ...prev, farm: farmRes.data[0].id }));
+        const firstFarm = farmRes.data[0];
+        setFormData(prev => ({
+          ...prev,
+          farm: firstFarm.id,
+          field: firstFarm.fields?.length > 0 ? firstFarm.fields[0].id : ''
+        }));
       }
+
+      if (tmplRes.data?.length > 0 && !formData.crop_template_id) {
+        const firstTmpl = tmplRes.data[0];
+        setFormData(prev => ({
+          ...prev,
+          crop_template_id: firstTmpl.id,
+          crop: firstTmpl.crop_name_en,
+          variant: firstTmpl.variant_name_en || '',
+          name: `${firstTmpl.crop_name_en} Operations 2026`
+        }));
+      }
+
       // Pre-select active categories for farm projects by default
       if (catRes.data.length > 0) {
         const activeIds = catRes.data
@@ -60,6 +84,47 @@ export default function FarmerProjects() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleFarmChange = (farmId) => {
+    const selectedFarm = farms.find(f => String(f.id) === String(farmId));
+    const firstField = selectedFarm?.fields?.length > 0 ? selectedFarm.fields[0] : null;
+    setFormData(prev => ({
+      ...prev,
+      farm: farmId,
+      field: firstField ? firstField.id : '',
+      target_area_acres: firstField?.area_acres ? String(firstField.area_acres) : (selectedFarm?.size_acres ? String(selectedFarm.size_acres) : prev.target_area_acres)
+    }));
+  };
+
+  const handleFieldChange = (fieldId) => {
+    const selectedFarm = farms.find(f => String(f.id) === String(formData.farm));
+    const selectedField = selectedFarm?.fields?.find(f => String(f.id) === String(fieldId));
+    setFormData(prev => ({
+      ...prev,
+      field: fieldId,
+      target_area_acres: selectedField?.area_acres ? String(selectedField.area_acres) : prev.target_area_acres
+    }));
+  };
+
+  const handleTemplateChange = (tmplId) => {
+    if (!tmplId) {
+      setFormData(prev => ({ ...prev, crop_template_id: '' }));
+      return;
+    }
+    const tmpl = cropTemplates.find(t => String(t.id) === String(tmplId));
+    if (tmpl) {
+      const durDays = tmpl.typical_duration_days || 120;
+      const endDt = new Date(Date.now() + 86400000 * durDays).toISOString().split('T')[0];
+      setFormData(prev => ({
+        ...prev,
+        crop_template_id: tmpl.id,
+        crop: tmpl.crop_name_en,
+        variant: tmpl.variant_name_en || '',
+        name: `${tmpl.crop_name_en} Operations ${new Date().getFullYear()}`,
+        expected_completion_date: endDt
+      }));
+    }
+  };
 
   const toggleCategorySelection = (catId) => {
     setSelectedCategories(prev =>
@@ -90,8 +155,11 @@ export default function FarmerProjects() {
       const payload = {
         name: formData.name,
         crop: formData.crop,
+        variant: formData.variant || '',
+        crop_template_id: formData.crop_template_id ? parseInt(formData.crop_template_id) : null,
         target_area_acres: parseFloat(formData.target_area_acres),
         farm: formData.farm ? parseInt(formData.farm) : null,
+        field: formData.field ? parseInt(formData.field) : null,
         start_date: formData.start_date,
         expected_completion_date: formData.expected_completion_date,
         notes: formData.notes,
@@ -186,12 +254,16 @@ export default function FarmerProjects() {
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1.5 font-bold">
                     <span className="text-slate-600">{lang === 'hi' ? 'समग्र प्रगति:' : 'Coordination Progress:'}</span>
-                    <span className="text-[#174D32]">{proj.completion_percentage}%</span>
+                    <span className="text-[#174D32]">
+                      {proj.completion_percentage !== null && proj.completion_percentage !== undefined
+                        ? `${proj.completion_percentage}%`
+                        : 'N/A'}
+                    </span>
                   </div>
                   <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
                     <div
                       className="bg-gradient-to-r from-[#84B547] to-[#174D32] h-full rounded-full transition-all duration-500"
-                      style={{ width: `${proj.completion_percentage}%` }}
+                      style={{ width: `${proj.completion_percentage ?? 0}%` }}
                     />
                   </div>
                 </div>
@@ -273,7 +345,30 @@ export default function FarmerProjects() {
               </div>
             )}
 
-            <form onSubmit={handleCreateProject} className="p-6 space-y-4">
+            <form onSubmit={handleCreateProject} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'मानकीकृत फसल कार्यप्रवाह टेम्पलेट (6 फसलें) *' : 'Crop Workflow Template (6 Core Crops) *'}
+                </label>
+                <select
+                  value={formData.crop_template_id}
+                  onChange={(e) => handleTemplateChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none bg-emerald-50/30 font-medium"
+                >
+                  <option value="">-- Custom Crop Operation --</option>
+                  {cropTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.crop_name_en} {t.variant_name_en ? `(${t.variant_name_en})` : ''} — {t.season} [{t.typical_duration_days} Days]
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {lang === 'hi'
+                    ? 'टेम्पलेट चुनने पर प्रमाणित क्रमबद्ध कृषि कार्य (क्रम, निर्भरताएं और आवश्यक सेवाएं) स्वतः जुड़ जाएंगे।'
+                    : 'Auto-generates sequential agricultural tasks, prerequisites, and linked service requirements.'}
+                </p>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   {lang === 'hi' ? 'प्रोजेक्ट का नाम *' : 'Project Name *'}
@@ -304,33 +399,66 @@ export default function FarmerProjects() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    {lang === 'hi' ? 'रकबा (एकड़) *' : 'Target Area (Acres) *'}
+                    {lang === 'hi' ? 'किस्म / वेरायटी' : 'Variant / Seed Type'}
                   </label>
                   <input
-                    type="number"
-                    step="0.5"
-                    value={formData.target_area_acres}
-                    onChange={(e) => setFormData({ ...formData, target_area_acres: e.target.value })}
+                    type="text"
+                    value={formData.variant}
+                    onChange={(e) => setFormData({ ...formData, variant: e.target.value })}
+                    placeholder="Standard High-Yielding"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                    required
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'खेत (Farm Plot)' : 'Farm Plot'}
+                  </label>
+                  <select
+                    value={formData.farm}
+                    onChange={(e) => handleFarmChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  >
+                    <option value="">-- Standalone (No Farm Plot) --</option>
+                    {farms.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name} ({f.size_acres} Acres, {f.village})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'खेत का टुकड़ा / फील्ड (Field)' : 'Field / Parcel'}
+                  </label>
+                  <select
+                    value={formData.field}
+                    onChange={(e) => handleFieldChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                    disabled={!formData.farm}
+                  >
+                    <option value="">-- All Farm Fields --</option>
+                    {farms.find(f => String(f.id) === String(formData.farm))?.fields?.map((fld) => (
+                      <option key={fld.id} value={fld.id}>
+                        {fld.name} ({fld.area_acres} Acres{fld.khasra_number ? `, Khasra ${fld.khasra_number}` : ''})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  {lang === 'hi' ? 'खेत चुनें' : 'Select Farm Plot'}
+                  {lang === 'hi' ? 'लक्षित रकबा (एकड़) *' : 'Target Area (Acres) *'}
                 </label>
-                <select
-                  value={formData.farm}
-                  onChange={(e) => setFormData({ ...formData, farm: e.target.value })}
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.target_area_acres}
+                  onChange={(e) => setFormData({ ...formData, target_area_acres: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
-                >
-                  <option value="">-- Standalone (No Farm Plot) --</option>
-                  {farms.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.size_acres} Acres)</option>
-                  ))}
-                </select>
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -712,15 +712,17 @@ class ProjectOperationRequestServiceView(APIView):
             else:
                 return Response({'error': 'A service category must be selected for this operation.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Extract delivery location from farm
+        # Extract delivery location from field and farm
+        field = project.field
         farm = project.farm
         village = farm.village if farm else request.user.village
         district = farm.district if farm else request.user.district
         state = farm.state if farm else request.user.state
 
         title = request.data.get('title') or f"{op.operation_name_en} — {project.name}"
-        desc = request.data.get('description') or f"Required for {project.crop} operation '{op.operation_name_en}' in {project.name}."
-        scope = request.data.get('scope_quantity') or f"{project.target_area_acres} Acres / {op.operation_name_en}"
+        field_note = f" [Field: {field.name} (Khasra: {field.khasra_number or 'N/A'}, {field.area_acres} Acres)]" if field else ""
+        desc = request.data.get('description') or f"Required for {project.crop} operation '{op.operation_name_en}' in {project.name}.{field_note}"
+        scope = request.data.get('scope_quantity') or f"{field.area_acres if field else project.target_area_acres} Acres / {op.operation_name_en}"
         req_date = request.data.get('required_date') or op.planned_start_date or timezone.localdate()
 
         from bookings.models import ServiceRequest

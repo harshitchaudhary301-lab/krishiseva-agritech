@@ -55,6 +55,20 @@ export default function WorkerBookings() {
     }
   };
 
+  const handleSubmitCompletion = async (id) => {
+    setActionLoading(id);
+    setMsg({ error: '', success: '' });
+    try {
+      await api.post(`/bookings/${id}/submit-completion/`, { notes: 'Worker declared work completed.' });
+      setMsg({ error: '', success: 'Work completion submitted! Awaiting farmer review & approval.' });
+      fetchBookings();
+    } catch (err) {
+      setMsg({ error: err.response?.data?.error || 'Failed to submit completion.', success: '' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleCancel = async (id) => {
     const reason = window.prompt(lang === 'hi' ? 'रद्द करने का कारण दर्ज करें:' : 'Enter reason for cancellation:');
     if (!reason) return;
@@ -162,13 +176,20 @@ export default function WorkerBookings() {
 
                 {b.status === 'in_progress' && (
                   <button
-                    onClick={() => handleStatus(b.id, 'completed')}
+                    onClick={() => handleSubmitCompletion(b.id)}
                     disabled={actionLoading === b.id}
                     className="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 flex items-center gap-1 cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                    <span>{lang === 'hi' ? 'कार्य पूर्ण मार्क करें' : 'Mark Job Completed'}</span>
+                    <span>{lang === 'hi' ? 'कार्य पूर्णता अनुमोदन हेतु भेजें' : 'Submit Completion for Sign-off'}</span>
                   </button>
+                )}
+
+                {b.status === 'completion_pending' && (
+                  <span className="text-xs font-bold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                    <span>{lang === 'hi' ? 'किसान समीक्षा लंबित' : 'Awaiting Farmer Sign-off'}</span>
+                  </span>
                 )}
 
                 {['pending_confirmation', 'confirmed'].includes(b.status) && (

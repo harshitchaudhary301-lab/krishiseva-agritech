@@ -160,7 +160,7 @@ class QuotationCreateView(APIView):
             # Server derives quote_amount automatically via model calculate_total()
             quote = serializer.save(provider=user)
 
-            Notification.objects.create(
+            Notification.send_unique(
                 recipient=service_req.farmer,
                 title="New Quotation Received!",
                 message=f"{user.get_full_name() or user.username} submitted Quote v{quote.quotation_version} of ₹{quote.quote_amount} for '{service_req.title}'.",
@@ -306,7 +306,7 @@ class QuotationAcceptView(APIView):
                 )
                 service_req.farm_project.update_project_status()
 
-            Notification.objects.create(
+            Notification.send_unique(
                 recipient=quote.provider,
                 title="Quotation Accepted! Please Confirm Booking",
                 message=f"Farmer {user.get_full_name() or user.username} accepted your Quote v{quote.quotation_version} for '{service_req.title}'. Confirm availability.",
@@ -486,7 +486,7 @@ class BookingAdditionalChargeView(APIView):
                 amount=amount,
                 reason=reason
             )
-            Notification.objects.create(
+            Notification.send_unique(
                 recipient=booking.farmer,
                 title="Additional Charge Approval Required",
                 message=f"Provider requested additional charge of ₹{amount} on {booking.reference_id}: {reason}.",

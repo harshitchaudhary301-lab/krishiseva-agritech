@@ -1,5 +1,6 @@
 import uuid
 import hashlib
+import datetime
 from decimal import Decimal
 from django.db import models, transaction
 from django.conf import settings
@@ -239,7 +240,7 @@ class Booking(models.Model):
             )
 
             # Notify farmer
-            Notification.objects.create(
+            Notification.send_unique(
                 recipient=locked.farmer,
                 title="Booking Confirmed!",
                 message=f"Provider {actor_user.get_full_name() or actor_user.username} confirmed your booking {locked.reference_id} for {locked.scheduled_date}.",
@@ -273,11 +274,16 @@ class Booking(models.Model):
             # Release resource reservation (BOOK-14)
             ResourceReservation.objects.filter(booking=locked).update(is_active=False)
 
-            # Reopen or cancel service request
+            # Reopen or cancel service request and update linked operations
             if is_provider:
                 locked.request.status = 'open'
                 locked.request.save()
-                Notification.objects.create(
+                for op in locked.request.linked_operations.all():
+                    if op.booking_id == locked.id or op.status == 'scheduled':
+                        op.booking = None
+                        op.status = 'service_requested'
+                        op.save()
+                Notification.send_unique(
                     recipient=locked.farmer,
                     title="Provider Cancelled Booking - Backup Options Available",
                     message=f"Provider {locked.provider.get_full_name() or locked.provider.username} cancelled booking {locked.reference_id}. Reason: {reason}. Alternative providers are available.",
@@ -286,7 +292,15 @@ class Booking(models.Model):
             else:
                 locked.request.status = 'cancelled'
                 locked.request.save()
-                Notification.objects.create(
+                for op in locked.request.linked_operations.all():
+                    if op.booking_id == locked.id or op.status == 'scheduled':
+                        op.booking = None
+                        if op.prerequisite_operation and op.prerequisite_operation.status != 'completed':
+                            op.status = 'awaiting_prerequisite'
+                        else:
+                            op.status = 'ready'
+                        op.save()
+                Notification.send_unique(
                     recipient=locked.provider,
                     title="Booking Cancelled by Farmer",
                     message=f"Farmer {locked.farmer.get_full_name() or locked.farmer.username} cancelled booking {locked.reference_id}. Reason: {reason}.",
@@ -334,7 +348,7 @@ class Booking(models.Model):
                 notes=notes
             )
 
-            Notification.objects.create(
+            Notification.send_unique(
                 recipient=locked.farmer,
                 title="Service Completion Review Required",
                 message=f"Provider {actor_user.get_full_name() or actor_user.username} submitted completion for {locked.reference_id}. Please inspect and confirm or dispute.",
@@ -360,11 +374,14 @@ class Booking(models.Model):
                 locked.request.status = 'completed'
                 locked.request.save()
 
-                # Update linked farm operations to completed
-                locked.request.linked_operations.update(
-                    status='completed',
-                    actual_completion_date=timezone.localdate()
-                )
+                # Update linked farm operations to completed and unlock dependent operations
+                for op in locked.request.linked_operations.all():
+                    op.status = 'completed'
+                    op.actual_completion_date = timezone.localdate()
+                    op.save()
+                    for dep in op.dependent_operations.filter(status='awaiting_prerequisite'):
+                        dep.status = 'ready'
+                        dep.save()
 
                 # Release reservation
                 ResourceReservation.objects.filter(booking=locked).update(is_active=False)
@@ -560,6 +577,16 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    @classmethod
+    def send_unique(cls, recipient, title, message, link_url='', deduplicate_window_seconds=60):
+        """
+        Deduplicates in-app notifications if identical notification exists within deduplicate_window_seconds.
+        """
+        cutoff = timezone.now() - datetime.timedelta(seconds=deduplicate_window_seconds)
+        if cls.objects.filter(recipient=recipient, title=title, message=message, created_at__gte=cutoff).exists():
+            return None
+        return cls.objects.create(recipient=recipient, title=title, message=message, link_url=link_url)
 
     def __str__(self):
         return f"Notification to {self.recipient.username}: {self.title}"

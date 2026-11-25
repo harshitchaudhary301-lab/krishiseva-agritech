@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -171,20 +172,20 @@ class FarmProject(models.Model):
             elif prog['completed_count'] > 0 or self.project_operations.filter(status__in=['in_progress', 'scheduled']).exists():
                 self.status = 'in_progress'
 
-        # Financial cost calculation from linked bookings and expenses
-        total_act = 0
-        total_est = 0
+        # Financial cost calculation from linked bookings and expenses using Decimal
+        total_act = Decimal('0.00')
+        total_est = Decimal('0.00')
         for op in self.project_operations.all():
-            if op.booking:
-                total_act += float(op.booking.agreed_amount)
-                total_est += float(op.booking.agreed_amount)
+            if op.booking and op.booking.agreed_amount:
+                total_act += Decimal(str(op.booking.agreed_amount))
+                total_est += Decimal(str(op.booking.agreed_amount))
             elif op.service_request:
                 req = op.service_request
-                if hasattr(req, 'booking') and req.booking:
-                    total_act += float(req.booking.agreed_amount)
-                    total_est += float(req.booking.agreed_amount)
+                if hasattr(req, 'booking') and req.booking and req.booking.agreed_amount:
+                    total_act += Decimal(str(req.booking.agreed_amount))
+                    total_est += Decimal(str(req.booking.agreed_amount))
                 elif req.budget_max:
-                    total_est += float(req.budget_max)
+                    total_est += Decimal(str(req.budget_max))
 
         self.estimated_budget = total_est
         self.actual_cost = total_act

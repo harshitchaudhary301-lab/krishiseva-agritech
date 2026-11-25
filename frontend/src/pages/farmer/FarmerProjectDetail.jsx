@@ -29,6 +29,49 @@ export default function FarmerProjectDetail() {
   const [scopeDesc, setScopeDesc] = useState('');
   const [addingService, setAddingService] = useState(false);
 
+  // Edit task modal state
+  const [editingOp, setEditingOp] = useState(null);
+  const [editOpForm, setEditOpForm] = useState({
+    operation_name_en: '',
+    operation_name_hi: '',
+    planned_start_date: '',
+    planned_end_date: '',
+    service_category: '',
+    notes: ''
+  });
+  const [savingOp, setSavingOp] = useState(false);
+
+  const handleOpenEditOp = (op) => {
+    setEditingOp(op);
+    setEditOpForm({
+      operation_name_en: op.operation_name_en || '',
+      operation_name_hi: op.operation_name_hi || '',
+      planned_start_date: op.planned_start_date || '',
+      planned_end_date: op.planned_end_date || '',
+      service_category: op.service_category || '',
+      notes: op.notes || ''
+    });
+  };
+
+  const handleSaveEditOp = async (e) => {
+    e.preventDefault();
+    if (!editingOp) return;
+    setSavingOp(true);
+    try {
+      await api.patch(`/farm-projects/operations/${editingOp.id}/`, {
+        ...editOpForm,
+        service_category: editOpForm.service_category ? parseInt(editOpForm.service_category) : null
+      });
+      setEditingOp(null);
+      fetchProjectDetails();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update task operation.');
+    } finally {
+      setSavingOp(false);
+    }
+  };
+
   // Modals for new modules
   const [showSeedModal, setShowSeedModal] = useState(false);
   const [showObsModal, setShowObsModal] = useState(false);
@@ -257,7 +300,7 @@ export default function FarmerProjectDetail() {
                 ⭐ Farm Task Manager USP
               </span>
               <span className="text-xs font-bold text-slate-500">
-                {project.farm_name || 'Farm Plot'} • {project.target_area_acres} Acres
+                {project.farm_name || 'Farm Plot'}{project.field_name ? ` • Field: ${project.field_name}` : ''} • {project.target_area_acres} Acres
               </span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
@@ -285,12 +328,16 @@ export default function FarmerProjectDetail() {
           <div className="lg:col-span-6 space-y-3">
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="text-slate-700">{lang === 'hi' ? 'समन्वय एवं तैयारी प्रगति:' : 'Operations Coordination Readiness:'}</span>
-              <span className="text-base text-[#174D32]">{project.completion_percentage}%</span>
+              <span className="text-base text-[#174D32]">
+                {project.completion_percentage !== null && project.completion_percentage !== undefined
+                  ? `${project.completion_percentage}%`
+                  : 'N/A'}
+              </span>
             </div>
             <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200">
               <div
                 className="bg-gradient-to-r from-[#84B547] to-[#174D32] h-full rounded-full transition-all duration-500"
-                style={{ width: `${project.completion_percentage}%` }}
+                style={{ width: `${project.completion_percentage ?? 0}%` }}
               />
             </div>
             <div className="text-[11px] text-slate-500">
@@ -672,6 +719,16 @@ export default function FarmerProjectDetail() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                        {!isDone && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditOp(op)}
+                            className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 bg-white text-xs font-semibold transition cursor-pointer"
+                            title="Edit task dates, notes, or service category"
+                          >
+                            {lang === 'hi' ? 'संपादित करें' : 'Edit'}
+                          </button>
+                        )}
                         {!isDone && !op.service_request && (
                           <button
                             onClick={() => handleRequestServiceForOperation(op)}
@@ -1483,6 +1540,126 @@ export default function FarmerProjectDetail() {
                   className="px-5 py-2 rounded-xl bg-[#174D32] text-white text-xs font-bold transition disabled:opacity-50"
                 >
                   {submittingModal ? 'Saving...' : 'Save Harvest Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingOp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-5 bg-[#174D32] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold">
+                  {lang === 'hi' ? 'कार्य संपादित करें' : 'Edit Project Task'}
+                </h3>
+                <p className="text-xs text-emerald-100 mt-0.5">
+                  #{editingOp.sequence_order}: {editingOp.operation_name_en}
+                </p>
+              </div>
+              <button onClick={() => setEditingOp(null)} className="p-2 text-white/80 hover:text-white rounded-xl">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditOp} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'कार्य का नाम (अंग्रेज़ी)' : 'Operation Name (English)'}
+                </label>
+                <input
+                  type="text"
+                  value={editOpForm.operation_name_en}
+                  onChange={(e) => setEditOpForm({ ...editOpForm, operation_name_en: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'कार्य का नाम (हिंदी)' : 'Operation Name (Hindi)'}
+                </label>
+                <input
+                  type="text"
+                  value={editOpForm.operation_name_hi}
+                  onChange={(e) => setEditOpForm({ ...editOpForm, operation_name_hi: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'शुरुआत तारीख' : 'Planned Start'}
+                  </label>
+                  <input
+                    type="date"
+                    value={editOpForm.planned_start_date}
+                    onChange={(e) => setEditOpForm({ ...editOpForm, planned_start_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {lang === 'hi' ? 'समाप्ति तारीख' : 'Planned End'}
+                  </label>
+                  <input
+                    type="date"
+                    value={editOpForm.planned_end_date}
+                    onChange={(e) => setEditOpForm({ ...editOpForm, planned_end_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'संबंधित सेवा श्रेणी' : 'Linked Service Category'}
+                </label>
+                <select
+                  value={editOpForm.service_category}
+                  onChange={(e) => setEditOpForm({ ...editOpForm, service_category: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                >
+                  <option value="">-- No Linked Category --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name_en} ({c.name_hi})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  {lang === 'hi' ? 'विशेष निर्देश / नोट्स' : 'Notes / Instructions'}
+                </label>
+                <textarea
+                  rows="2"
+                  value={editOpForm.notes}
+                  onChange={(e) => setEditOpForm({ ...editOpForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#84B547] outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingOp(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700"
+                >
+                  {lang === 'hi' ? 'रद्द करें' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingOp}
+                  className="px-5 py-2 rounded-xl bg-[#174D32] hover:bg-[#0e3321] text-white text-xs font-bold transition disabled:opacity-50"
+                >
+                  {savingOp ? 'Saving...' : (lang === 'hi' ? 'सहेजें' : 'Save Changes')}
                 </button>
               </div>
             </form>

@@ -57,6 +57,24 @@ export default function FarmerBookings() {
     }
   };
 
+  const handleConfirmCompletion = async (bookingId, isApproved) => {
+    let reason = '';
+    if (!isApproved) {
+      reason = window.prompt(lang === 'hi' ? 'आपत्ति / विवाद का कारण दर्ज करें:' : 'Please enter reason for dispute:');
+      if (!reason) return;
+    }
+    try {
+      await api.post(`/bookings/${bookingId}/confirm-completion/`, {
+        approved: isApproved,
+        reason: reason
+      });
+      alert(isApproved ? (lang === 'hi' ? 'सेवा पूर्णता स्वीकृत! धन्यवाद।' : 'Service completion approved!') : (lang === 'hi' ? 'आपत्ति दर्ज की गई।' : 'Dispute recorded.'));
+      fetchBookings();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to record completion decision.');
+    }
+  };
+
   const openBackupModal = (bookingId) => {
     setSelectedBackupBookingId(bookingId);
     setBackupModalOpen(true);
@@ -248,6 +266,22 @@ export default function FarmerBookings() {
                         {lang === 'hi' ? 'बुकिंग रद्द करें' : 'Cancel Booking'}
                       </button>
                     )
+                  ) : b.status === 'completion_pending' ? (
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={() => handleConfirmCompletion(b.id, true)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{lang === 'hi' ? 'कार्य स्वीकृत करें' : 'Approve Completion'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleConfirmCompletion(b.id, false)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer"
+                      >
+                        <span>{lang === 'hi' ? 'आपत्ति दर्ज करें' : 'Dispute'}</span>
+                      </button>
+                    </div>
                   ) : b.status === 'completed' ? (
                     <button
                       onClick={() => {

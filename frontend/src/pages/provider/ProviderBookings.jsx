@@ -55,6 +55,20 @@ export default function ProviderBookings() {
     }
   };
 
+  const handleSubmitCompletion = async (id) => {
+    setActionLoading(id);
+    setMsg({ error: '', success: '' });
+    try {
+      await api.post(`/bookings/${id}/submit-completion/`, { notes: 'Provider declared service completed.' });
+      setMsg({ error: '', success: 'Service completion submitted! Awaiting farmer inspection & sign-off.' });
+      fetchBookings();
+    } catch (err) {
+      setMsg({ error: err.response?.data?.error || 'Failed to submit completion.', success: '' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -141,12 +155,20 @@ export default function ProviderBookings() {
 
                 {b.status === 'in_progress' && (
                   <button
-                    onClick={() => handleStatus(b.id, 'completed')}
-                    className="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 flex items-center gap-1"
+                    onClick={() => handleSubmitCompletion(b.id)}
+                    disabled={actionLoading === b.id}
+                    className="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 flex items-center gap-1 cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Complete Job</span>
+                    <span>Submit Completion for Review</span>
                   </button>
+                )}
+
+                {b.status === 'completion_pending' && (
+                  <span className="text-xs font-bold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                    <span>Awaiting Farmer Review</span>
+                  </span>
                 )}
               </div>
             </div>
