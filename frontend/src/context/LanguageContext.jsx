@@ -4,7 +4,7 @@ const LanguageContext = createContext();
 
 export const translations = {
   en: {
-    appName: "KrishiSeva",
+    appName: "AgroUday",
     tagline: "खेती की हर जरूरत, एक जगह।",
     subTagline: "The Farm Operations Coordination Platform",
     heroHeading: "Every Farm Need, in One Connected Platform.",
@@ -162,7 +162,7 @@ export const translations = {
     }
   },
   hi: {
-    appName: "कृषि सेवा",
+    appName: "एग्रो उदय (AgroUday)",
     tagline: "खेती की हर जरूरत, एक जगह।",
     subTagline: "कृषि कार्य समन्वय एवं सेवा मंच",
     heroHeading: "खेती की हर जरूरत, एक जगह।",

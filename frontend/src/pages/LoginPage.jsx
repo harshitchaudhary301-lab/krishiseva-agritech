@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Lock, User, ArrowRight, Sparkles, Loader2, AlertCircle, KeyRound, CheckCircle2, X } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,7 @@ export default function LoginPage() {
   const { login, quickLogin } = useAuth();
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -27,12 +28,45 @@ export default function LoginPage() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState({ error: '', success: '' });
 
-  const redirectByRole = (role) => {
-    if (role === 'farmer') navigate('/farmer/overview');
-    else if (role === 'worker') navigate('/worker/dashboard');
-    else if (role === 'provider') navigate('/provider/dashboard');
-    else if (role === 'admin') navigate('/admin-dashboard');
-    else navigate('/farmer/overview');
+  const redirectByRole = (user) => {
+    const role = typeof user === 'string' ? user : (user?.role || 'farmer');
+    const fromPath = location.state?.from;
+    const requestedCat = location.state?.category;
+
+    // Validate permitted navigation destination according to routing rules
+    if (fromPath && typeof fromPath === 'string' && fromPath.startsWith('/')) {
+      if (fromPath.startsWith('/farmer') && role === 'farmer') {
+        const dest = requestedCat ? `${fromPath}${fromPath.includes('?') ? '&' : '?'}requestCategory=${encodeURIComponent(requestedCat)}` : fromPath;
+        navigate(dest, { replace: true });
+        return;
+      }
+      if (fromPath.startsWith('/worker') && role === 'worker') {
+        navigate(fromPath, { replace: true });
+        return;
+      }
+      if (fromPath.startsWith('/provider') && role === 'provider') {
+        navigate(fromPath, { replace: true });
+        return;
+      }
+      if (fromPath.startsWith('/admin') && (role === 'admin' || user?.is_superuser)) {
+        navigate(fromPath, { replace: true });
+        return;
+      }
+    }
+
+    // Role-based default destination
+    if (role === 'farmer') {
+      const dest = requestedCat ? `/farmer/overview?requestCategory=${encodeURIComponent(requestedCat)}` : '/farmer/overview';
+      navigate(dest, { replace: true });
+    } else if (role === 'worker') {
+      navigate('/worker/dashboard', { replace: true });
+    } else if (role === 'provider') {
+      navigate('/provider/dashboard', { replace: true });
+    } else if (role === 'admin') {
+      navigate('/admin-dashboard', { replace: true });
+    } else {
+      navigate('/farmer/overview', { replace: true });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -45,7 +79,7 @@ export default function LoginPage() {
     setError('');
     try {
       const user = await login(username, password);
-      redirectByRole(user.role);
+      redirectByRole(user);
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.error || 'Invalid username or password. Please try again.');
@@ -59,7 +93,7 @@ export default function LoginPage() {
     setError('');
     try {
       const user = await quickLogin(key);
-      redirectByRole(user.role);
+      redirectByRole(user);
     } catch (err) {
       console.error(err);
       setError('Failed to log in with demo account. Ensure Django backend is running.');
@@ -270,7 +304,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-xs text-slate-600">
             <span>{lang === 'hi' ? 'नया खाता बनाना चाहते हैं?' : "Don't have an account yet?"}{' '}</span>
-            <Link to="/register" className="font-bold text-[#174D32] hover:underline">
+            <Link to="/register" state={location.state} className="font-bold text-[#174D32] hover:underline">
               {t('register')}
             </Link>
           </div>

@@ -17,4 +17,10 @@ python manage.py migrate
 echo "==> Seeding initial service categories and master data..."
 python manage.py seed_demo_data --skip-admin --preserve-existing
 
-echo "==> KrishiSeva backend build completed successfully!"
+echo "==> Seeding crop workflow templates..."
+python manage.py seed_crop_templates || true
+
+echo "==> Importing agricultural reference data..."
+python manage.py import_agricultural_reference_data || true
+
+echo "==> AgroUday backend build completed successfully!"

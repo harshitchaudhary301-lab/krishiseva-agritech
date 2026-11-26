@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, Lock, Phone, MapPin, Mail, Tractor, Wrench, Users, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [role, setRole] = useState('farmer');
   const [formData, setFormData] = useState({
@@ -40,10 +41,37 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
 
   const redirectByRole = (userRole) => {
-    if (userRole === 'farmer') navigate('/farmer/overview');
-    else if (userRole === 'worker') navigate('/worker/dashboard');
-    else if (userRole === 'provider') navigate('/provider/dashboard');
-    else navigate('/farmer/overview');
+    const fromPath = location.state?.from;
+    const requestedCat = location.state?.category;
+
+    // Validate permitted navigation destination according to routing rules
+    if (fromPath && typeof fromPath === 'string' && fromPath.startsWith('/')) {
+      if (fromPath.startsWith('/farmer') && userRole === 'farmer') {
+        const dest = requestedCat ? `${fromPath}${fromPath.includes('?') ? '&' : '?'}requestCategory=${encodeURIComponent(requestedCat)}` : fromPath;
+        navigate(dest, { replace: true });
+        return;
+      }
+      if (fromPath.startsWith('/worker') && userRole === 'worker') {
+        navigate(fromPath, { replace: true });
+        return;
+      }
+      if (fromPath.startsWith('/provider') && userRole === 'provider') {
+        navigate(fromPath, { replace: true });
+        return;
+      }
+    }
+
+    // Role-based default destination
+    if (userRole === 'farmer') {
+      const dest = requestedCat ? `/farmer/overview?requestCategory=${encodeURIComponent(requestedCat)}` : '/farmer/overview';
+      navigate(dest, { replace: true });
+    } else if (userRole === 'worker') {
+      navigate('/worker/dashboard', { replace: true });
+    } else if (userRole === 'provider') {
+      navigate('/provider/dashboard', { replace: true });
+    } else {
+      navigate('/farmer/overview', { replace: true });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -466,7 +494,7 @@ export default function RegisterPage() {
 
           <div className="mt-6 text-center text-xs text-slate-600">
             <span>{lang === 'hi' ? 'पहले से खाता है?' : 'Already have an account?'}{' '}</span>
-            <Link to="/login" className="font-bold text-[#174D32] hover:underline">
+            <Link to="/login" state={location.state} className="font-bold text-[#174D32] hover:underline">
               {t('login')}
             </Link>
           </div>

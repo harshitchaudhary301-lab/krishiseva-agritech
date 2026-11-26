@@ -56,7 +56,7 @@ export default function FarmerLayout() {
               </div>
               <div>
                 <span className="font-black text-lg text-white">
-                  Krishi<span className="text-[#84B547]">Seva</span>
+                  Agro<span className="text-[#84B547]">Uday</span>
                 </span>
                 <div className="text-[10px] text-white/60 font-hindi -mt-1 font-semibold">
                   किसान पोर्टल

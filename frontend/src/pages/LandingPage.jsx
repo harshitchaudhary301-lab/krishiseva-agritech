@@ -47,17 +47,18 @@ function HeroNavbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'py-2' : 'py-4 lg:py-6'
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 pointer-events-none ${
+        scrolled ? 'py-2' : 'py-3 sm:py-4 lg:py-5'
       }`}
     >
-      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
+      {/* Centred at approximately 65-80% of hero width, adapting to content */}
+      <div className="w-[94%] sm:w-[86%] lg:w-[74%] max-w-[1100px] mx-auto pointer-events-auto">
         {/* Floating obsidian pill */}
         <div
-          className={`flex items-center justify-between rounded-full px-5 py-2.5 lg:px-6 lg:py-3 transition-all duration-300 ${
+          className={`flex items-center justify-between rounded-full px-4 sm:px-6 py-2 sm:py-2.5 transition-all duration-300 ${
             scrolled
-              ? 'bg-[#101510]/95 backdrop-blur-md shadow-2xl shadow-black/30 border border-white/10'
-              : 'bg-[#101510]/80 backdrop-blur-sm shadow-xl shadow-black/20 border border-white/5'
+              ? 'bg-[#101510]/95 backdrop-blur-md shadow-2xl shadow-black/40 border border-white/15'
+              : 'bg-[#101510]/85 backdrop-blur-sm shadow-xl shadow-black/30 border border-white/10'
           }`}
         >
           {/* Logo */}
@@ -65,21 +66,21 @@ function HeroNavbar() {
             <div className="w-8 h-8 rounded-lg bg-[#174D32] flex items-center justify-center">
               <Sprout className="w-4.5 h-4.5 text-[#84B547]" />
             </div>
-            <span className="text-lg font-black tracking-tight text-white">
-              Krishi<span className="text-[#84B547]">Seva</span>
+            <span className="text-base sm:text-lg font-black tracking-tight text-white">
+              Agro<span className="text-[#84B547]">Uday</span>
             </span>
-            <span className="hidden sm:inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#174D32] text-[#84B547] border border-[#84B547]/30">
-              Bharat
+            <span className="hidden md:inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#174D32] text-[#84B547] border border-[#84B547]/30">
+              Pitch Preview
             </span>
           </Link>
 
           {/* Desktop Centre Links */}
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-0.5 xl:gap-1">
             {navLinks.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className="px-3.5 py-1.5 text-[13px] font-semibold text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                className="px-3 py-1.5 text-[12px] xl:text-[13px] font-semibold text-white/85 hover:text-white rounded-full hover:bg-white/10 transition-colors"
               >
                 {item.label}
               </a>
@@ -87,11 +88,11 @@ function HeroNavbar() {
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Language */}
             <button
               onClick={toggleLanguage}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[12px] font-semibold text-white/75 hover:text-white hover:bg-white/10 transition cursor-pointer"
             >
               <Globe className="w-3.5 h-3.5 text-[#84B547]" />
               <span>{lang === 'hi' ? 'EN' : 'हिं'}</span>
@@ -101,13 +102,13 @@ function HeroNavbar() {
               <>
                 <Link
                   to={getDashboardPath()}
-                  className="px-4 py-1.5 rounded-full bg-white text-[#101510] text-[13px] font-bold hover:bg-white/90 transition shadow-xs"
+                  className="px-3.5 sm:px-4 py-1.5 rounded-full bg-white text-[#101510] text-xs font-bold hover:bg-white/90 transition shadow-xs"
                 >
                   {lang === 'hi' ? 'डैशबोर्ड' : 'Dashboard'}
                 </Link>
                 <button
                   onClick={logout}
-                  className="hidden sm:inline-flex px-3 py-1.5 rounded-full text-[12px] font-semibold text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                  className="hidden sm:inline-flex px-3 py-1.5 rounded-full text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
                 >
                   {lang === 'hi' ? 'लॉगआउट' : 'Log Out'}
                 </button>
@@ -116,13 +117,13 @@ function HeroNavbar() {
               <>
                 <Link
                   to="/register"
-                  className="hidden sm:inline-flex px-4 py-1.5 rounded-full text-[13px] font-bold text-white/80 hover:text-white hover:bg-white/10 transition"
+                  className="hidden sm:inline-flex px-3.5 py-1.5 rounded-full text-xs font-bold text-white/85 hover:text-white hover:bg-white/10 transition"
                 >
                   {lang === 'hi' ? 'पंजीकरण' : 'Sign Up'}
                 </Link>
                 <Link
                   to="/login"
-                  className="px-4 py-1.5 rounded-full bg-[#FCE052] text-[#101510] text-[13px] font-bold hover:bg-[#FFF3B0] transition shadow-xs"
+                  className="px-3.5 sm:px-4 py-1.5 rounded-full bg-[#FCE052] text-[#101510] text-xs font-bold hover:bg-[#FFF3B0] transition shadow-xs"
                 >
                   {lang === 'hi' ? 'लॉगिन' : 'Log In'}
                 </Link>
@@ -223,39 +224,141 @@ function CapabilityStrip({ lang }) {
   );
 }
 
-/* ─── Feature Card (lower-right) ──────────────────────────── */
+/* ─── Feature Card (Safe Product Preview) ──────────────────────────── */
 function FeatureCard({ lang }) {
   return (
-    <div className="w-[280px] lg:w-[320px] rounded-2xl overflow-hidden shadow-2xl shadow-black/40 backdrop-blur-sm border border-white/15">
-      {/* Top photo strip */}
-      <div
-        className="h-[96px] bg-cover bg-center"
-        style={{
-          backgroundImage: 'linear-gradient(to bottom, transparent 40%, #174D32), url(/images/krishiseva/hero/hero-desktop.jpg)',
-          backgroundPosition: 'center 30%',
-        }}
-      />
-      {/* Content */}
-      <div className="bg-[#174D32] px-5 py-4 space-y-2.5">
-        <h3 className="text-[15px] font-bold text-white leading-snug">
-          {lang === 'hi' ? 'आपका डिजिटल फार्म मैनेजर' : 'Your Digital Farm Manager'}
-        </h3>
-        <p className="text-[11px] text-emerald-100/80 leading-relaxed">
-          {lang === 'hi'
-            ? 'मिट्टी से फसल तक — फसल योजना, सेवा खोज और खर्च प्रबंधन एक जगह।'
-            : 'From soil to harvest — plan crops, discover services, and manage expenses in one place.'}
-        </p>
-        <Link
-          to="/register"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#FCE052] text-[#101510] text-[12px] font-bold hover:bg-[#FFF3B0] transition"
-        >
-          <span>{lang === 'hi' ? 'फार्म प्लानिंग देखें' : 'Explore Farm Planning'}</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+    <div className="w-[290px] lg:w-[330px] rounded-2xl overflow-hidden shadow-2xl shadow-black/50 backdrop-blur-md border border-white/20 bg-[#174D32]/95 text-white">
+      {/* Product Preview Header */}
+      <div className="px-4 py-3 bg-[#101510]/85 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#84B547] animate-pulse" />
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">
+            {lang === 'hi' ? 'फार्म प्रोजेक्ट लाइव' : 'Farm Project Preview'}
+          </span>
+        </div>
+        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FCE052] text-[#101510]">
+          Wheat 2026
+        </span>
+      </div>
+
+      {/* Product Preview Body */}
+      <div className="p-4 sm:p-5 space-y-3.5">
+        <div>
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="text-white">{lang === 'hi' ? 'कटाई एवं मड़ाई कार्य' : 'Harvesting & Threshing'}</span>
+            <span className="text-[#FCE052]">65%</span>
+          </div>
+          <div className="w-full bg-white/15 h-2 rounded-full overflow-hidden mt-1.5">
+            <div className="bg-[#84B547] h-full rounded-full transition-all duration-500" style={{ width: '65%' }} />
+          </div>
+        </div>
+
+        <div className="space-y-2 text-[11px]">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-white/10 border border-white/10">
+            <div className="flex items-center gap-2">
+              <Tractor className="w-3.5 h-3.5 text-[#FCE052]" />
+              <span className="font-semibold text-white/95">Combine Harvester (20 Ac)</span>
+            </div>
+            <span className="text-[#84B547] font-bold">Confirmed</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded-xl bg-white/10 border border-white/10">
+            <div className="flex items-center gap-2">
+              <Users className="w-3.5 h-3.5 text-[#FCE052]" />
+              <span className="font-semibold text-white/95">5 Skilled Workers</span>
+            </div>
+            <span className="text-[#84B547] font-bold">Confirmed</span>
+          </div>
+        </div>
+
+        <div className="pt-1">
+          <a
+            href="#farm-manager"
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-full bg-[#FCE052] text-[#101510] text-[12px] font-extrabold hover:bg-[#FFF3B0] transition shadow-xs"
+          >
+            <span>{lang === 'hi' ? 'फार्म प्लानिंग देखें' : 'Explore Farm Planning'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
       </div>
     </div>
   );
 }
+
+// 8 Highlighted Categories per Quality Lock §2
+const HIGHLIGHTED_CATEGORIES = [
+  {
+    slug: 'machinery_rental',
+    name_en: 'Combine Harvester & Machinery Rental',
+    name_hi: 'कंबाइन हार्वेस्टर व मशीनरी किराया',
+    desc_en: 'Heavy harvest combines, laser land levelers, and specialized implements with transparent rates.',
+    desc_hi: 'कंबाइन हार्वेस्टर, लेजर लैंड लेवलर एवं आधुनिक कृषि यंत्र पारदर्शी प्रति एकड़ दरों पर उपलब्ध।',
+    rate: '₹1,500 - ₹2,500 / Acre',
+    photo: '/images/krishiseva/services/machinery_rental.jpg',
+  },
+  {
+    slug: 'tractor_mechanic',
+    name_en: 'Tractor Mechanic & Emergency Repair',
+    name_hi: 'ट्रैक्टर मैकेनिक एवं आपातकालीन मरम्मत',
+    desc_en: 'Certified diesel mechanics for on-farm hydraulic, transmission, and engine breakdown diagnostics.',
+    desc_hi: 'खेत पर ही हाइड्रोलिक, ट्रांसमिशन और इंजन की मरम्मत के लिए प्रमाणित डीजल मैकेनिक।',
+    rate: '₹300 - ₹1,500 / Visit',
+    photo: '/images/krishiseva/services/tractor_mechanic.jpg',
+  },
+  {
+    slug: 'labour',
+    name_en: 'Agricultural Field Labour',
+    name_hi: 'कुशल एवं अकुशल कृषि श्रमिक',
+    desc_en: 'Verified adult farm worker groups for seasonal transplanting, weeding, and manual crop operations.',
+    desc_hi: 'रोपाई, निराई-गुड़ाई और कटाई के लिए 18+ सत्यापित कुशल एवं अकुशल कृषि श्रमिक समूह।',
+    rate: '₹400 - ₹600 / Day',
+    photo: '/images/krishiseva/services/labour.jpg',
+  },
+  {
+    slug: 'tubewell_repair',
+    name_en: 'Tubewell Repair & Boring',
+    name_hi: 'ट्यूबवेल मरम्मत एवं सबमर्सिबल कार्य',
+    desc_en: 'Submersible pump extraction, motor rewinding, starter repairs, and irrigation maintenance.',
+    desc_hi: 'सबमर्सिबल पंप निकालना, मोटर रिवाइंडिंग, स्टार्टर रिपेयर और पाइपलाइन मरम्मत कार्य।',
+    rate: '₹500 - ₹2,000 / Job',
+    photo: '/images/krishiseva/services/tubewell_repair.jpg',
+  },
+  {
+    slug: 'land_preparation',
+    name_en: 'Land Preparation & Deep Tillage',
+    name_hi: 'खेत की जुताई एवं पलेवा तैयारी',
+    desc_en: 'Rotavator tillage, deep disc ploughing, and bed shaping tailored to crop soil requirements.',
+    desc_hi: 'रोटावेटर, डिस्क हैरो और गहरी जुताई द्वारा बुवाई हेतु आदर्श खेत की तैयारी।',
+    rate: '₹800 - ₹1,800 / Acre',
+    photo: '/images/krishiseva/services/land_preparation.jpg',
+  },
+  {
+    slug: 'sowing_planting',
+    name_en: 'Sowing & Precision Planting',
+    name_hi: 'बीज बुवाई एवं सीड ड्रिल सेवाएं',
+    desc_en: 'Zero-till drill sowing, potato planters, and sugarcane trench cutters for uniform placement.',
+    desc_hi: 'जीरो-टिल सीड ड्रिल और आधुनिक प्लांटर द्वारा सटीक गहराई एवं दूरी पर बीज की बुवाई।',
+    rate: '₹600 - ₹1,400 / Acre',
+    photo: '/images/krishiseva/services/sowing_planting.jpg',
+  },
+  {
+    slug: 'harvesting',
+    name_en: 'Harvesting & Threshing',
+    name_hi: 'फसल कटाई एवं मड़ाई (थ्रेसिंग)',
+    desc_en: 'Stationary multi-crop threshers, manual reaping crews, and mechanized crop collection.',
+    desc_hi: 'मल्टी-क्रॉप थ्रेशर, रीपर और अनुभवी कटाई दल द्वारा सुरक्षित और कम दाना नुकसान वाली कटाई।',
+    rate: '₹1,200 - ₹2,200 / Acre',
+    photo: '/images/krishiseva/services/harvesting.jpg',
+  },
+  {
+    slug: 'transportation',
+    name_en: 'Agricultural Transportation to Mandi',
+    name_hi: 'मंडी परिवहन एवं ट्रैक्टर ट्रॉली',
+    desc_en: 'Heavy tractor trolley transport from farm gate directly to local APMC mandis and sugar mills.',
+    desc_hi: 'खेत से स्थानीय कृषि मंडी और चीनी मिल तक फसल की सुरक्षित और त्वरित ढुलाई।',
+    rate: '₹500 - ₹1,500 / Trip',
+    photo: '/images/krishiseva/services/transportation.jpg',
+  },
+];
 
 /* ─── MAIN LANDING PAGE ───────────────────────────────────── */
 export default function LandingPage() {
@@ -276,14 +379,16 @@ export default function LandingPage() {
   }, []);
 
   const handleCategoryAction = (cat) => {
-    if (!cat.is_active) return;
+    const slug = cat.slug || cat;
     if (user?.role === 'farmer') {
-      setSelectedCatSlug(cat.slug);
+      setSelectedCatSlug(slug);
       setCreateReqOpen(true);
-    } else if (user) {
+    } else if (user?.role === 'provider') {
       navigate('/provider/dashboard');
+    } else if (user?.role === 'worker') {
+      navigate('/worker/dashboard');
     } else {
-      navigate('/login');
+      navigate('/login', { state: { from: '/farmer/overview', category: slug } });
     }
   };
 
@@ -317,100 +422,91 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#F4F4EE] text-[#172D20] font-sans selection:bg-[#FCE052] selection:text-[#101510]">
       {/* ─── 1. HERO SECTION & CAPABILITY STRIP ─── */}
-      <HeroNavbar />
+      <section id="hero" className="relative w-full min-h-[92vh] lg:min-h-screen overflow-hidden bg-[#101510] flex flex-col justify-between">
+        {/* Full-bleed cinematic photograph */}
+        <picture className="absolute inset-0 w-full h-full">
+          <source
+            media="(max-width: 639px)"
+            srcSet="/images/krishiseva/hero/hero-mobile.jpg"
+          />
+          <img
+            src="/images/krishiseva/hero/hero-desktop.jpg"
+            alt="Green tractor on Indian farmland at golden sunrise"
+            className="w-full h-full object-cover object-[72%_center] sm:object-[center_60%] lg:object-[80%_center]"
+            fetchPriority="high"
+            decoding="async"
+          />
+        </picture>
 
-      <section id="hero" className="relative w-full overflow-hidden bg-[#101510] pt-24 pb-8 lg:pt-28 lg:pb-10">
-        <div className="mx-3 sm:mx-5 lg:mx-6 xl:mx-8">
-          <div
-            className="relative rounded-[24px] lg:rounded-[32px] overflow-hidden border border-white/10 shadow-2xl"
-            style={{ height: 'clamp(520px, 86vh, 940px)' }}
-          >
-            {/* Background photograph */}
-            <picture>
-              <source
-                media="(max-width: 639px)"
-                srcSet="/images/krishiseva/hero/hero-mobile.jpg"
-              />
-              <img
-                src="/images/krishiseva/hero/hero-desktop.jpg"
-                alt="Green tractor on Indian farmland at golden sunrise"
-                className="absolute inset-0 w-full h-full object-cover object-center"
-                fetchPriority="high"
-                decoding="async"
-              />
-            </picture>
+        {/* Localized gradients behind text rather than darkening complete photograph */}
+        <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black/70 via-black/25 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 left-0 w-full lg:w-[58%] bg-gradient-to-r from-black/85 via-black/45 to-transparent pointer-events-none" />
 
-            {/* Gradient overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.4)_100%)]" />
+        {/* Floating navbar placed inside the photograph container */}
+        <HeroNavbar />
 
-            {/* Content layer */}
-            <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-8 lg:p-10 xl:p-12">
-              <div className="h-10 sm:h-12" />
-
-              {/* Bottom content row */}
-              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 lg:gap-10">
-                {/* Left — Hero copy */}
-                <div className="max-w-2xl space-y-4 lg:space-y-6">
-                  {/* Eyebrow */}
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-                    <Sparkles className="w-3.5 h-3.5 text-[#FCE052]" />
-                    <span className="text-[11px] sm:text-xs font-bold text-white/95 tracking-widest uppercase">
-                      {lang === 'hi'
-                        ? 'एक प्लेटफ़ॉर्म। संपूर्ण खेती का सफर।'
-                        : 'ONE PLATFORM. COMPLETE FARMING JOURNEY.'}
-                    </span>
-                  </div>
-
-                  {/* Headline */}
-                  <h1 className="text-[34px] sm:text-[48px] lg:text-[62px] xl:text-[70px] font-black leading-[1.05] tracking-tight text-white">
-                    {lang === 'hi' ? (
-                      <>
-                        आपका खेत।<br />
-                        आपका भविष्य।<br />
-                        <span className="text-[#FCE052]">हमारा साथ।</span>
-                      </>
-                    ) : (
-                      <>
-                        Your Farm.<br />
-                        Your Future.<br />
-                        <span className="text-[#FCE052]">Our Commitment.</span>
-                      </>
-                    )}
-                  </h1>
-
-                  {/* Description */}
-                  <p className="text-sm sm:text-base lg:text-lg text-white/85 leading-relaxed max-w-xl font-normal">
-                    {lang === 'hi'
-                      ? 'मिट्टी से फसल तक, अपनी खेती की योजना बनाएं, सही सेवाएं खोजें और विश्वास के साथ अपना खेत चलाएं।'
-                      : 'From soil to harvest, plan your farming journey, find the right services and manage your farm with confidence.'}
-                  </p>
-
-                  {/* CTAs */}
-                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
-                    <Link
-                      to="/register"
-                      className="inline-flex items-center gap-2 px-6 sm:px-8 py-3.5 rounded-full bg-[#FCE052] text-[#101510] text-sm sm:text-base font-extrabold hover:bg-[#FFF3B0] transition shadow-lg shadow-yellow-500/25"
-                    >
-                      <span>{lang === 'hi' ? 'शुरू करें' : 'Get Started'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                    <a
-                      href="#services"
-                      className="inline-flex items-center gap-2 px-5 sm:px-6 py-3.5 rounded-full border border-white/30 text-white text-sm sm:text-base font-semibold hover:bg-white/10 transition backdrop-blur-sm"
-                    >
-                      <span>{lang === 'hi' ? 'कृषि सेवाएं देखें' : 'Explore KrishiSeva'}</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
-
-                {/* Right — Feature Card (desktop only) */}
-                <div className="hidden lg:block shrink-0">
-                  <FeatureCard lang={lang} />
-                </div>
+        {/* Hero content layer */}
+        <div className="relative z-10 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-12 sm:pb-16 lg:pb-20 flex-1 flex flex-col justify-end">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 lg:gap-12">
+            {/* Left — Hero copy */}
+            <div className="max-w-2xl space-y-4 lg:space-y-6">
+              {/* Eyebrow */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/15 border border-white/20 backdrop-blur-sm">
+                <Sparkles className="w-3.5 h-3.5 text-[#FCE052]" />
+                <span className="text-[11px] sm:text-xs font-bold text-white tracking-widest uppercase">
+                  {lang === 'hi'
+                    ? 'एक प्लेटफ़ॉर्म। संपूर्ण खेती का सफर।'
+                    : 'ONE PLATFORM. COMPLETE FARMING JOURNEY.'}
+                </span>
               </div>
+
+              {/* Headline — predominantly white */}
+              <h1 className="text-[34px] sm:text-[48px] lg:text-[62px] xl:text-[68px] font-black leading-[1.06] tracking-tight text-white drop-shadow-md">
+                {lang === 'hi' ? (
+                  <>
+                    आपका खेत।<br />
+                    आपका भविष्य।<br />
+                    <span className="text-white">हमारा </span><span className="text-[#FCE052]">संकल्प।</span>
+                  </>
+                ) : (
+                  <>
+                    Your Farm.<br />
+                    Your Future.<br />
+                    <span className="text-white">Our </span><span className="text-[#FCE052]">Commitment.</span>
+                  </>
+                )}
+              </h1>
+
+              {/* Description */}
+              <p className="text-sm sm:text-base lg:text-lg text-white/90 leading-relaxed max-w-xl font-normal drop-shadow-sm">
+                {lang === 'hi'
+                  ? 'मिट्टी से फसल तक, अपनी खेती की योजना बनाएं, सही सेवाएं खोजें और विश्वास के साथ अपना खेत चलाएं।'
+                  : 'From soil to harvest, plan your farming journey, find the right services and manage your farm with confidence.'}
+              </p>
+
+              {/* CTAs */}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
+                <Link
+                  to="/register"
+                  className="inline-flex items-center gap-2 px-6 sm:px-8 py-3.5 rounded-full bg-[#FCE052] text-[#101510] text-sm sm:text-base font-extrabold hover:bg-[#FFF3B0] transition shadow-lg shadow-yellow-500/25"
+                >
+                  <span>{lang === 'hi' ? 'शुरू करें' : 'Get Started'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <a
+                  href="#services"
+                  className="inline-flex items-center gap-2 px-5 sm:px-6 py-3.5 rounded-full border border-white/35 bg-black/20 text-white text-sm sm:text-base font-semibold hover:bg-white/15 transition backdrop-blur-sm"
+                >
+                  <span>{lang === 'hi' ? 'कृषि सेवाएं देखें' : 'Explore KrishiSeva'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+
+            {/* Right — Feature Card (desktop only, safe product preview) */}
+            <div className="hidden lg:block shrink-0">
+              <FeatureCard lang={lang} />
             </div>
           </div>
         </div>
@@ -447,65 +543,73 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Service Cards Grid */}
+          {/* Service Cards Grid — Exactly 8 Highlighted Categories with 16:10 Photographs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories.slice(0, 8).map((cat) => (
+            {HIGHLIGHTED_CATEGORIES.map((cat) => (
               <div
-                key={cat.id}
+                key={cat.slug}
                 onClick={() => handleCategoryAction(cat)}
-                className={`group rounded-2xl p-6 bg-white border border-[#E2E8DF] shadow-sm hover:shadow-xl hover:border-[#174D32] transition-all duration-300 flex flex-col justify-between cursor-pointer ${
-                  !cat.is_active ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
+                className="group rounded-2xl bg-white border border-[#E2E8DF] shadow-sm hover:shadow-xl hover:border-[#174D32] transition-all duration-300 flex flex-col justify-between overflow-hidden cursor-pointer"
               >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-[#F4F4EE] group-hover:bg-[#174D32] group-hover:text-white text-[#174D32] flex items-center justify-center transition-colors">
-                      <Tractor className="w-6 h-6" />
+                <div>
+                  {/* Category-specific photograph with consistent 16:10 aspect ratio */}
+                  <div className="aspect-[16/10] w-full overflow-hidden relative bg-[#101510]">
+                    <img
+                      src={cat.photo}
+                      alt={cat.name_en}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                    <div className="absolute top-3 right-3 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#101510]/80 text-[#84B547] border border-[#84B547]/40 backdrop-blur-xs">
+                      {lang === 'hi' ? 'सक्रिय' : 'Active'}
                     </div>
-                    {cat.is_active ? (
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        {lang === 'hi' ? 'सक्रिय' : 'Active'}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                        {lang === 'hi' ? 'आगामी' : 'Coming Soon'}
-                      </span>
-                    )}
+                    <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
                   </div>
 
-                  <div>
-                    <h3 className="text-lg font-bold text-[#172D20] group-hover:text-[#174D32] transition">
+                  <div className="p-5 space-y-2">
+                    <h3 className="text-base sm:text-lg font-bold text-[#172D20] group-hover:text-[#174D32] transition leading-snug line-clamp-1">
                       {lang === 'hi' ? cat.name_hi : cat.name_en}
                     </h3>
-                    <p className="text-xs text-[#64748B] mt-1.5 leading-relaxed line-clamp-3">
-                      {lang === 'hi' ? cat.description_hi : cat.description_en}
+                    <p className="text-xs text-[#64748B] leading-relaxed line-clamp-2">
+                      {lang === 'hi' ? cat.desc_hi : cat.desc_en}
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-6 mt-4 border-t border-[#E2E8DF] flex items-center justify-between text-xs">
-                  <div>
-                    <div className="text-[10px] uppercase font-bold text-[#64748B]">
-                      {lang === 'hi' ? 'मानक दर' : 'Typical Rate'}
+                <div className="p-5 pt-0">
+                  <div className="pt-4 border-t border-[#E2E8DF] flex items-center justify-between text-xs">
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-[#64748B]">
+                        {lang === 'hi' ? 'मानक दर' : 'Typical Rate'}
+                      </div>
+                      <div className="font-extrabold text-[#172D20] mt-0.5">
+                        {cat.rate}
+                      </div>
                     </div>
-                    <div className="font-extrabold text-[#172D20] mt-0.5">
-                      {cat.typical_price_range || '₹300 - ₹2,000'}
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCategoryAction(cat);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#174D32] group-hover:bg-[#0e3321] text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                    >
+                      <span>{lang === 'hi' ? 'सेवा मांगें' : 'Request'}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <span className="w-8 h-8 rounded-full bg-[#F4F4EE] group-hover:bg-[#FCE052] group-hover:text-[#101510] text-[#172D20] flex items-center justify-center transition">
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
                 </div>
               </div>
             ))}
           </div>
 
+          {/* Preserve all remaining categories in the existing marketplace per Quality Lock §2 */}
           <div className="mt-12 text-center">
             <Link
-              to="/login"
+              to={user ? "/farmer/services" : "/login"}
+              state={user ? undefined : { from: '/farmer/services' }}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#174D32] text-white text-xs font-bold hover:bg-[#0e3321] transition shadow-md"
             >
-              <span>{lang === 'hi' ? 'सभी 16+ सेवाएं खोजें' : 'Browse Complete Service Catalogue'}</span>
+              <span>{lang === 'hi' ? 'सभी 21+ सेवाएं खोजें (सेवा बाज़ार)' : 'Browse Complete Service Catalogue (All 21 Categories)'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

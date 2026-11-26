@@ -626,3 +626,114 @@ Implemented the locked layout matching §14 specifications:
 
 - **Stage 00+01 (Gate A):** `b2eba90` — *feat(ui): cinematic hero landing page, design system update, remove automatic data defaults*
 - **Stage 02+03 (Gate B):** `6fd3601` — *feat(ui): complete 9-section landing page, styled auth interfaces, and reference-locked farmer dashboard*
+
+---
+
+## 12. KS-FDC-04-CORRECTION-01 — FINAL EXECUTION QUALITY LOCK
+
+**Quality Lock Order ID:** `KS-FDC-04-CORRECTION-01`  
+**Application Scope:** Visual Precision, Functional Precision, Weather Access Control, Change Isolation, Before-and-After Verification  
+**Enforcement Status:** Completed — Locked at **AWAITING DASHBOARD APPROVAL (GATE B)**
+
+### 12.1 Visual Precision & Asset Authority
+
+1. **Cinematic Hero Execution (`frontend/src/pages/LandingPage.jsx`):**
+   - **Full-Bleed Photographic Composition:** Implemented `relative min-h-[92vh] lg:min-h-screen w-full overflow-hidden` photographic container with zero arbitrary surrounding borders.
+   - **Tractor Focal Point Preservation:** Applied distinct responsive positioning (`object-[80%_center]` on desktop `lg:block`, `object-[72%_center]` on mobile) ensuring the green John Deere tractor remains the dominant focal point without cropping across any viewport.
+   - **Internal Centered Navbar:** Fixed navigation inside the photograph container centered at 74% of available hero width (`w-[94%] sm:w-[86%] lg:w-[74%] max-w-[1100px] mx-auto`), fully responsive and floating with `backdrop-blur-md bg-[#101510]/80`.
+   - **Localized Contrast Gradients:** Removed all global darkening overlays. Introduced an isolated directional gradient (`from-black/85 via-black/50 to-transparent`) specifically behind the text column (`w-full lg:w-[58%]`), keeping the right photograph field bright and organic.
+   - **Predominantly White Headline:** Formatted headline *"Your Farm. Your Future. Our Commitment."* in pure white (`text-white`) with high-contrast subtext.
+   - **Authentic Feature Card Preview:** Replaced duplicated hero photograph with a dedicated **Farm Project Preview Card** featuring live progress metrics, confirmed tasks (Combine Harvester & Field Labourers), and direct workflow action.
+
+2. **Public Services Precision (`frontend/src/pages/LandingPage.jsx`):**
+   - **8 Highlighted Categories:** Restricted public landing page to exactly eight representative categories:
+     1. Machinery Rental (`machinery_rental.jpg`)
+     2. Tractor Mechanic & Maintenance (`tractor_mechanic.jpg`)
+     3. Field Labour & Sowing Teams (`labour.jpg`)
+     4. Tubewell & Pump Repairs (`tubewell_repair.jpg`)
+     5. Land Preparation & Laser Levelling (`land_preparation.jpg`)
+     6. Sowing & Crop Planting (`sowing_planting.jpg`)
+     7. Harvesting & Threshing (`harvesting.jpg`)
+     8. Agricultural Produce Transport (`transportation.jpg`)
+   - **Consistent 16:10 Ratio:** Standardized all category cards with `aspect-[16/10]` photography, category tags, clear indicative pricing, and localized Hindi titles.
+   - **Marketplace Completeness:** Full catalog (21 categories) preserved and accessible via secondary CTA linking to `/farmer/services`.
+
+3. **Farmer Dashboard ("MY FARM, MY DAY") (`frontend/src/pages/farmer/FarmerOverview.jsx`):**
+   - **Panoramic Agricultural Banner:** Added high-resolution panoramic farm photography (`/images/krishiseva/dashboard/farm-banner-panoramic.jpg`) to the farm overview header with localized bottom-up gradient preserving full legibility of farm name, Daurala location, and acreage.
+   - **Removal of Technical Labels:** Cleaned up internal technical terminology — removed `LGD:` database prefix, replaced raw `FIN-01 to FIN-12` label with human-readable "Verified Ledger" / "सत्यापित लेजर", and removed "Operational records ledger • Two-decimal precision".
+   - **Flexible Dimensions:** Accommodates extended Hindi typography and mobile viewports with `min-w-0`, responsive typography, and flex wrapping.
+
+### 12.2 Functional Precision & Business Rules
+
+1. **Independent Requirement & Operation Derivation:**
+   - Agricultural operations maintain independent service requirements, status transitions, and quotation workflows.
+   - Operations do not assume full readiness based on a single confirmed service booking.
+2. **Authentication Navigation & Category Preservation:**
+   - `frontend/src/components/ProtectedRoute.jsx`: Captures intended target destination in unauthenticated redirect (`state={{ from: location.pathname + location.search }}`).
+   - `frontend/src/pages/LoginPage.jsx` & `RegisterPage.jsx`: Extracts both `state.from` and `state.category`. Validates user role against target route permissions. Redirects farmer directly to `${fromPath}?requestCategory=${category}`.
+   - Preserves state across login <-> register transitions without loss.
+   - Automatically opens `CreateRequestModal` on arrival in `FarmerOverview.jsx` when `requestCategory` search param is present.
+3. **BOOK and FIN Business Rule Adherence:**
+   - Preserved `BOOK-01` through `BOOK-10` workflow logic and `FIN-01` through `FIN-12` two-decimal financial ledger integrity without introducing duplicate transactions.
+
+### 12.3 Weather Access Control & Factual Disclaimers
+
+1. **Backend Commercial Restrictions (`backend/services/weather.py`):**
+   - Enforced unauthorized commercial weather restrictions directly on backend (`is_commercial_weather_authorized()`).
+   - If unauthorized commercial access is attempted or API key is absent, backend prevents live external requests and returns an explicit unavailable state (`status: unavailable`, `is_live: False`).
+   - Returns factual benchmark observations with explicit metadata: `source`, `location`, `timestamp`, `freshness`, `attribution`, and district benchmarks.
+2. **Agricultural Safety Assurances Removal:**
+   - Stripped unsupported safety claims (e.g. "favorable for all activities", "can proceed safely without risk").
+   - Replaced with factual agricultural observations (e.g. "Low humidity and clear skies recorded. Normal irrigation scheduling applies; monitor soil moisture.").
+
+### 12.4 Change Isolation & Token Control
+
+- Reused existing design tokens (`#101510`, `#174D32`, `#84B547`, `#FCE052`, `#F4F4EE`).
+- Scoped all CSS modifications to targeted component trees.
+- Zero extraneous packages installed.
+- Preserved existing user configurations, models, routes, and migrations.
+
+### 12.5 Before-and-After Comparison
+
+| Dimension | Baseline State (Pre-Correction) | Corrected State (KS-FDC-04-CORRECTION-01) | Status |
+|---|---|---|---|
+| **Hero Photographic Composition** | Generic hero background with full-surface dark tint | Full-bleed cinematic photo with localized text-only gradient (`w-full lg:w-[58%]`) | **CORRECTED** |
+| **Hero Navbar Placement** | Independent full-width bar outside photo | Centered within photo at ~74% width (`max-w-[1100px] mx-auto`) with backdrop blur | **CORRECTED** |
+| **Tractor Focal Point** | Center-cropped; tractor cab truncated on mobile | Responsive focal anchoring (`object-[80%_center]` desktop / `object-[72%_center]` mobile) | **CORRECTED** |
+| **Feature Card Visual** | Duplicated hero photograph | Authentic "Farm Project Preview" card showing live progress and Harvester & Labour tasks | **CORRECTED** |
+| **Service Photography** | SVG placeholder icons in service cards | High-resolution 16:10 category photographs (`aspect-[16/10]`) across 8 highlighted cards | **CORRECTED** |
+| **Public Services Scope** | Inconsistent service list | Exactly 8 highlighted services on landing page; full 21-category marketplace link preserved | **CORRECTED** |
+| **Dashboard Banner Imagery** | CSS linear gradient box | Panoramic agricultural photograph (`farm-banner-panoramic.jpg`) with localized contrast gradient | **CORRECTED** |
+| **Technical Terminology** | `LGD: 123456`, `FIN-01 - FIN-12`, "Two-decimal precision" | Natural language: "Daurala, Meerut", "Verified Ledger / सत्यापित लेजर", clean descriptions | **CORRECTED** |
+| **Weather Access Control** | Frontend conditional rendering only | Backend commercial weather restriction enforcement with explicit unavailable status | **CORRECTED** |
+| **Weather Disclaimers** | Unverified safety guarantees ("can proceed safely") | Strictly factual observations + explicit meteorological attribution & disclaimer | **CORRECTED** |
+| **Auth Destination Preservation** | Discarded selected category and intended URL on redirect | Preserved `from` path and `category` across login, register, and automatic modal opening | **CORRECTED** |
+
+### 12.6 Verification Evidence & Verification Runs
+
+| Verification Check | Target Command | Result | Pass/Fail |
+|---|---|---|---|
+| **Backend Test Suite** | `python backend/manage.py test accounts bookings services farm_projects` | Ran 48 tests in 60.835s (0 failures, 0 errors) | **PASS** |
+| **Django System Check** | `python backend/manage.py check` | System check identified no issues (0 silenced) | **PASS** |
+| **Frontend Production Build** | `npm --prefix frontend run build` | Built successfully in 743ms (2,236 modules transformed, 0 errors) | **PASS** |
+
+### 12.7 Actual Captured Screenshot Evidence
+
+The following high-resolution screenshots were captured from the running application:
+
+- **Desktop Landing Page (1440 × 900):**  
+  [corrected_landing_desktop_1440.png](file:///c:/Users/Harshit/Downloads/krishi/docs/screenshots/corrected_landing_desktop_1440.png) (1,278,230 bytes)
+- **Mobile Landing Page (390 × 844):**  
+  [corrected_landing_mobile_390.png](file:///c:/Users/Harshit/Downloads/krishi/docs/screenshots/corrected_landing_mobile_390.png) (308,161 bytes)
+- **Farmer Dashboard Desktop (1440 × 900):**  
+  [corrected_dashboard_desktop_1440.png](file:///c:/Users/Harshit/Downloads/krishi/docs/screenshots/corrected_dashboard_desktop_1440.png) (365,722 bytes)
+- **Farmer Dashboard Mobile (390 × 844):**  
+  [corrected_dashboard_mobile_390.png](file:///c:/Users/Harshit/Downloads/krishi/docs/screenshots/corrected_dashboard_mobile_390.png) (552,646 bytes)
+
+### 12.8 Gate Status & Scope Boundaries
+
+- **Current Gate:** **AWAITING DASHBOARD APPROVAL (GATE B)**
+- **Stage 04 (Provider & Worker Dashboards):** NOT STARTED (Preserved for subsequent instruction).
+- **Stage 05 (Platform Administrator Dashboard & Governance):** NOT STARTED (Preserved for subsequent instruction).
+- **Git State:** Local modifications preserved on `mission03-mvp`. No commit, push, merge, or deployment executed.
+

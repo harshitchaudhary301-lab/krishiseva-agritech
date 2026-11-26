@@ -62,6 +62,11 @@ export default function App() {
     <LanguageProvider>
       <AuthProvider>
         <BrowserRouter>
+          {/* AgroUday Pitch Preview Safety Banner */}
+          <div className="sticky top-0 z-50 bg-[#101510] text-amber-300 border-b border-amber-500/30 px-3 py-1.5 text-center text-xs font-semibold tracking-wide flex items-center justify-center gap-2 select-none shadow-sm">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span>AgroUday Pitch Preview • Development Demonstration Only • Real Payments & Bookings Disabled</span>
+          </div>
           <Routes>
             {/* Public Routes — Landing has its own nav/footer */}
             <Route

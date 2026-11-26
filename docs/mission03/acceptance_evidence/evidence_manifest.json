@@ -1,0 +1,132 @@
+{
+  "manifest_title": "KRISHISEVA MISSION 03 PRE-ACCEPTANCE EVIDENCE MANIFEST",
+  "order_id": "KS-SM-003-EVG-003",
+  "parent_order": "KS-SM-003-DEV-003",
+  "generated_at": "2026-11-25T00:33:01.163978",
+  "git_branch": "mission03-mvp",
+  "git_commit_sha": "9e49924d8ff7413dbd4ed8ef21808a313cfe68bf",
+  "base_commit_sha": "4a512e68407eece46a39d892697e8bead6472464",
+  "total_files": 20,
+  "files": [
+    {
+      "relative_path": "DEFECTS_BLOCKERS_AND_ACCEPTANCE.md",
+      "file_size_bytes": 8716,
+      "sha256": "5f8f9d84f259caa792f797716216a9b1683d64d59bd8b8c57f23c8739d8a0694",
+      "modified_at": "2026-11-25T00:32:35.550452"
+    },
+    {
+      "relative_path": "DEVELOPER_CHECK_EVIDENCE.md",
+      "file_size_bytes": 16306,
+      "sha256": "9db2e5c278c32c904919a7140d7664b043662b43827c7b71e2a2743f7319a71e",
+      "modified_at": "2026-11-25T00:28:44.462817"
+    },
+    {
+      "relative_path": "END_TO_END_WORKFLOW_EVIDENCE.md",
+      "file_size_bytes": 10182,
+      "sha256": "8767d5fafadb6c05f45e72eb06c86e277dcc2f07a798ad3705d63b2e0aa8d822",
+      "modified_at": "2026-11-25T00:29:30.605753"
+    },
+    {
+      "relative_path": "MISSION_03_IMPLEMENTATION_REPORT.md",
+      "file_size_bytes": 40158,
+      "sha256": "a4ba50d47e6913757f17f6522181ec355124f764cbf4d768863e7b40444406b3",
+      "modified_at": "2026-11-24T23:57:04.424981"
+    },
+    {
+      "relative_path": "V3_REQUIREMENT_TRACEABILITY.csv",
+      "file_size_bytes": 34363,
+      "sha256": "522dd78a3ec22e129827f9e67ac5a658399c61efbaa63755dd083d19a8877a33",
+      "modified_at": "2026-11-25T00:31:58.130095"
+    },
+    {
+      "relative_path": "logs/01_baseline_and_isolation.log",
+      "file_size_bytes": 1426,
+      "sha256": "afe6c9279aeb9f9693fa93f266bcceb15a6eb0de51ae52489fc67c2d897738f2",
+      "modified_at": "2026-11-25T00:15:01.156001"
+    },
+    {
+      "relative_path": "logs/02_backend_check.log",
+      "file_size_bytes": 2682,
+      "sha256": "ffe802269b2e788b023742c8b233529545fbeb13227143d596a23130c91180a3",
+      "modified_at": "2026-11-25T00:15:14.267413"
+    },
+    {
+      "relative_path": "logs/03_backend_tests.log",
+      "file_size_bytes": 19002,
+      "sha256": "cf9f210a58003300e12e90ce041ab455ceb0f4efa14bfda74ca10461f7834ae5",
+      "modified_at": "2026-11-25T00:13:54.427428"
+    },
+    {
+      "relative_path": "logs/04_frontend_checks.log",
+      "file_size_bytes": 210894,
+      "sha256": "19675bc4160e884f9ea6261a350b95f5c70075ed71bc1dac9e94f843d0758a21",
+      "modified_at": "2026-11-25T00:15:48.182152"
+    },
+    {
+      "relative_path": "logs/05_security_rbac.log",
+      "file_size_bytes": 7322,
+      "sha256": "68d83cd67c29edf82bc8e836c9aa5c7b6e6ea9f04d1410979230cc06334a6e78",
+      "modified_at": "2026-11-25T00:16:47.696381"
+    },
+    {
+      "relative_path": "logs/06_six_crops_verification.log",
+      "file_size_bytes": 3732,
+      "sha256": "c7b6b4d3596e5bda60edde23203d0b240f4e5e7495878083dd606a5daac54e7d",
+      "modified_at": "2026-11-25T00:18:25.614533"
+    },
+    {
+      "relative_path": "logs/07_financial_verification.log",
+      "file_size_bytes": 4004,
+      "sha256": "9a5adace48cd4b15e1d1929331794d5ed7bf9204f0d5685498d67831da2f8ada",
+      "modified_at": "2026-11-25T00:22:22.673535"
+    },
+    {
+      "relative_path": "logs/08_research_import.log",
+      "file_size_bytes": 1634,
+      "sha256": "c9c6978f43849e6ddc5c55ed844b74dc6175ca14c3123d1aedb2dea9ef874aaf",
+      "modified_at": "2026-11-25T00:18:54.926900"
+    },
+    {
+      "relative_path": "logs/09_e2e_workflows.log",
+      "file_size_bytes": 5294,
+      "sha256": "f9d7368866ff9320cf97312df88452babe33248c45fd7ba0630de9b88e8db316",
+      "modified_at": "2026-11-25T00:27:37.405714"
+    },
+    {
+      "relative_path": "scripts/generate_traceability_matrix.py",
+      "file_size_bytes": 70857,
+      "sha256": "0172b856547b3ea54c6467baf3eec83f67b987c2665732c19f659f3be25f4da6",
+      "modified_at": "2026-11-25T00:31:52.935349"
+    },
+    {
+      "relative_path": "scripts/package_acceptance_evidence.py",
+      "file_size_bytes": 3762,
+      "sha256": "6e1c88e3a00edb3a056abf66e1ce3305a4cc7f90ceb31463e00847a00d476105",
+      "modified_at": "2026-11-25T00:32:56.274175"
+    },
+    {
+      "relative_path": "scripts/verify_e2e_workflows.py",
+      "file_size_bytes": 14886,
+      "sha256": "d6834e49b3c2feb6a37a3efcb109252c3ff67652e8067729f5eca1f72a625f5a",
+      "modified_at": "2026-11-25T00:27:29.793591"
+    },
+    {
+      "relative_path": "scripts/verify_financial_accounting.py",
+      "file_size_bytes": 11368,
+      "sha256": "868ec16904073ad49f8622794c00380ed953d77a457602d53f5fb17e351e741d",
+      "modified_at": "2026-11-25T00:22:18.149321"
+    },
+    {
+      "relative_path": "scripts/verify_security_rbac.py",
+      "file_size_bytes": 8515,
+      "sha256": "2579abea87f3521ac3b1c756b55f24b76e12a05b8e9343e09928454877ad1747",
+      "modified_at": "2026-11-25T00:16:37.399990"
+    },
+    {
+      "relative_path": "scripts/verify_six_crops.py",
+      "file_size_bytes": 6620,
+      "sha256": "96b4a2ab81f9a91eac24125aee7984599b3f0451f2d13db9af140f017d2bf6fa",
+      "modified_at": "2026-11-25T00:17:47.037274"
+    }
+  ]
+}

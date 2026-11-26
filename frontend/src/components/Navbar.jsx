@@ -56,10 +56,10 @@ export default function Navbar() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-black tracking-tight text-[#174D32]">
-                    Krishi<span className="text-[#84B547]">Seva</span>
+                    Agro<span className="text-[#84B547]">Uday</span>
                   </span>
                   <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300/60">
-                    MVP
+                    Pitch Preview
                   </span>
                 </div>
                 <div className="text-[11px] font-semibold text-slate-500 font-hindi -mt-0.5">

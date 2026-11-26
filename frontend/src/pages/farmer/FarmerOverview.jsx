@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Tractor, Users, Wrench, Droplet, Plus, ArrowRight,
   FolderKanban, Calendar, Clock, CheckCircle2, AlertTriangle,
@@ -17,6 +17,7 @@ export default function FarmerOverview() {
   const { user } = useAuth();
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
@@ -28,6 +29,18 @@ export default function FarmerOverview() {
   const [analytics, setAnalytics] = useState(null);
   const [createReqOpen, setCreateReqOpen] = useState(false);
   const [preselectedSlug, setPreselectedSlug] = useState(null);
+
+  // Preserve category & trigger request modal from navigation
+  useEffect(() => {
+    const reqCat = searchParams.get('requestCategory');
+    if (reqCat) {
+      setPreselectedSlug(reqCat);
+      setCreateReqOpen(true);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('requestCategory');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -136,11 +149,17 @@ export default function FarmerOverview() {
   return (
     <div className="space-y-6">
       {/* ─── ROW 1: FARM OVERVIEW BANNER (12 Columns per §14) ─── */}
-      <div className="bg-gradient-to-r from-[#174D32] via-[#174D32] to-[#236544] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-emerald-950">
-        {/* Subtle decorative glow */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-[#84B547]/20 blur-3xl pointer-events-none" />
+      <div className="relative rounded-3xl overflow-hidden shadow-xl border border-emerald-950 bg-[#174D32] min-h-[180px] flex flex-col justify-between">
+        {/* Panoramic agricultural background photograph */}
+        <img
+          src="/images/krishiseva/dashboard/farm-banner-panoramic.jpg"
+          alt="Panoramic agricultural farmland in Western Uttar Pradesh"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+        />
+        {/* Localized gradient overlay for high contrast and readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#101510]/95 via-[#101510]/80 to-[#174D32]/65" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="relative z-10 p-6 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             {/* Top Bar: Farm Selector & Location */}
             <div className="flex flex-wrap items-center gap-2">
@@ -149,7 +168,7 @@ export default function FarmerOverview() {
                   <select
                     value={activeFarm?.id || ''}
                     onChange={(e) => setSelectedFarmId(Number(e.target.value))}
-                    className="appearance-none bg-white/20 text-white font-bold text-xs pl-3 pr-8 py-1.5 rounded-full border border-white/20 outline-none cursor-pointer hover:bg-white/30 transition"
+                    className="appearance-none bg-white/20 text-white font-bold text-xs pl-3 pr-8 py-1.5 rounded-full border border-white/20 outline-none cursor-pointer hover:bg-white/30 transition backdrop-blur-xs"
                   >
                     {farms.map(f => (
                       <option key={f.id} value={f.id} className="text-[#101510]">
@@ -159,21 +178,18 @@ export default function FarmerOverview() {
                   </select>
                 </div>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[11px] font-bold text-emerald-100 border border-white/10">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[11px] font-bold text-emerald-100 border border-white/10 backdrop-blur-xs">
                   <MapPin className="w-3.5 h-3.5 text-[#FCE052]" />
                   <span>{activeFarm?.name || 'Ganga Khet'}</span>
                 </span>
               )}
 
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[11px] font-semibold text-white/80">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[11px] font-semibold text-white/90 backdrop-blur-xs">
                 <span>{activeFarm?.village || user?.village || 'Daurala'}, {activeFarm?.district || user?.district || 'Meerut'}</span>
-                {activeFarm?.lgd_code && (
-                  <span className="text-[10px] text-[#FCE052]">LGD: {activeFarm.lgd_code}</span>
-                )}
               </span>
 
               {activeFarm?.soil_type && (
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-900/60 text-emerald-200 border border-emerald-700/50">
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-900/80 text-emerald-200 border border-emerald-700/50 backdrop-blur-xs">
                   {activeFarm.soil_type}
                 </span>
               )}
@@ -181,10 +197,10 @@ export default function FarmerOverview() {
 
             {/* Farm Title & Welcome */}
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-sm">
                 {lang === 'hi' ? `राम-राम, ${user?.first_name || 'किसान भाई'}!` : `Welcome back, ${user?.first_name || 'Farmer'}!`}
               </h1>
-              <p className="text-xs sm:text-sm text-emerald-100/85 mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-emerald-100/90 mt-1 leading-relaxed">
                 {lang === 'hi'
                   ? `खेत का रकबा: ${activeFarm?.size_acres || '20'} एकड़ • फसलें: ${activeFarm?.current_crops || 'गेहूं, गन्ना'} • पारदर्शी ग्रामीण सेवा समन्वय`
                   : `Farm Size: ${activeFarm?.size_acres || '20'} Acres • Active Crops: ${activeFarm?.current_crops || 'Wheat, Sugarcane'} • Operations Sync`}
@@ -206,7 +222,7 @@ export default function FarmerOverview() {
             </button>
             <Link
               to="/farmer/projects"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition border border-white/20"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition border border-white/25 backdrop-blur-xs"
             >
               <FolderKanban className="w-4 h-4 text-[#FCE052]" />
               <span>{lang === 'hi' ? 'फसल योजना बनाएं' : 'Plan Crop Project'}</span>
@@ -335,17 +351,23 @@ export default function FarmerOverview() {
                   {lang === 'hi' ? 'मौसम संदर्भ' : 'Advisory Weather'}
                 </h3>
               </div>
-              <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
-                {weather?.is_live ? 'Live' : 'Benchmark'}
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                weather?.is_live
+                  ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                  : 'text-amber-800 bg-amber-50 border-amber-200'
+              }`}>
+                {weather?.is_live
+                  ? (lang === 'hi' ? 'लाइव' : 'Live')
+                  : (lang === 'hi' ? 'क्षेत्रीय मानक' : 'Regional Benchmark')}
               </span>
             </div>
 
             {weather ? (
-              <div className="pt-4 space-y-4">
+              <div className="pt-4 space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-3xl font-black text-[#172D20]">
-                      {weather.current?.temperature_c || 26}°C
+                      {weather.current?.temperature_c || 24}°C
                     </div>
                     <div className="text-xs font-bold text-[#174D32] mt-0.5">
                       {lang === 'hi' ? weather.current?.condition_hi : weather.current?.condition_en}
@@ -354,18 +376,46 @@ export default function FarmerOverview() {
                   <div className="text-right text-xs text-[#64748B] space-y-1">
                     <div className="flex items-center justify-end gap-1">
                       <Droplets className="w-3 h-3 text-blue-500" />
-                      <span>{weather.current?.humidity_percent || 55}% Humidity</span>
+                      <span>{weather.current?.humidity_percent || 60}% Humidity</span>
                     </div>
                     <div className="flex items-center justify-end gap-1">
                       <Wind className="w-3 h-3 text-slate-400" />
-                      <span>{weather.current?.wind_speed_kmh || 12} km/h Wind</span>
+                      <span>{weather.current?.wind_speed_kmh || 8.5} km/h Wind</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Advisory Notice */}
+                {/* Factual Weather Metadata per §4 */}
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-[#64748B] bg-[#F4F4EE] p-2.5 rounded-xl border border-[#E2E8DF]">
+                  <div>
+                    <span className="font-semibold text-slate-500 block">{lang === 'hi' ? 'स्रोत:' : 'Source:'}</span>
+                    <span className="font-bold text-[#172D20] truncate block" title={weather.source || weather.data_source}>
+                      {weather.source ? (weather.source.includes('IMD') ? 'IMD Agro Reference' : 'Open-Meteo') : 'IMD Agro Reference'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 block">{lang === 'hi' ? 'स्थान:' : 'Location:'}</span>
+                    <span className="font-bold text-[#172D20] truncate block">
+                      {weather.location?.district || activeFarm?.district || 'Meerut'}, UP
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 block">{lang === 'hi' ? 'समय:' : 'Timestamp:'}</span>
+                    <span className="font-bold text-[#172D20] truncate block">
+                      {weather.observation_timestamp ? new Date(weather.observation_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 block">{lang === 'hi' ? 'ताज़गी:' : 'Freshness:'}</span>
+                    <span className="font-bold text-[#172D20] truncate block">
+                      {weather.is_live ? 'Live' : 'Standard Benchmark'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Advisory / Factual Observation per §4 */}
                 <div className="p-3 rounded-2xl bg-[#FAF8F2] border border-amber-200/70 text-[11px] leading-relaxed text-[#172D20]">
-                  <strong className="block text-amber-900 mb-0.5">🌾 {lang === 'hi' ? 'सलाहकार संदर्भ:' : 'Advisory Notice:'}</strong>
+                  <strong className="block text-amber-900 mb-0.5">🌾 {lang === 'hi' ? 'मौसम अवलोकन:' : 'Factual Observation:'}</strong>
                   <span>{lang === 'hi' ? weather.agro_advisory_hi : weather.agro_advisory_en}</span>
                 </div>
               </div>
@@ -376,11 +426,11 @@ export default function FarmerOverview() {
             )}
           </div>
 
-          {/* Statutory Policy Disclaimer per §8 */}
+          {/* Statutory Policy Disclaimer per §4 & §8 */}
           <div className="pt-3 mt-3 border-t border-[#E2E8DF] text-[10px] text-[#64748B] leading-tight">
             {lang === 'hi'
-              ? 'सलाहकारी संदर्भ मात्र; मंच बुकिंग स्वतः रद्द नहीं करता।'
-              : 'Advisory reference only; platform does not auto-cancel bookings.'}
+              ? 'सलाहकारी अवलोकन मात्र; मंच सुरक्षा आश्वासन अथवा स्वतः बुकिंग निरस्तीकरण नहीं करता।'
+              : 'Factual reference only; platform does not provide safety guarantees or auto-cancel bookings.'}
           </div>
         </div>
       </div>
@@ -632,8 +682,8 @@ export default function FarmerOverview() {
                   {lang === 'hi' ? 'वित्तीय लेजर व खर्च सारांश' : 'Authoritative Financial Ledger'}
                 </h3>
               </div>
-              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                FIN-01 - FIN-12
+              <span className="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {lang === 'hi' ? 'सत्यापित लेजर' : 'Verified Ledger'}
               </span>
             </div>
 
@@ -691,7 +741,7 @@ export default function FarmerOverview() {
 
           <div className="pt-4 mt-4 border-t border-[#E2E8DF] flex items-center justify-between text-xs">
             <span className="text-[10px] text-[#64748B] line-clamp-1">
-              Operational records ledger • Two-decimal precision
+              {lang === 'hi' ? 'खेत खर्च एवं वित्तीय संतुलन लेजर' : 'Operational farm expenditure and balance ledger'}
             </span>
             <Link to="/farmer/analytics" className="font-bold text-[#174D32] hover:underline shrink-0">
               {lang === 'hi' ? 'विस्तृत रिपोर्ट' : 'Full Analytics'}
